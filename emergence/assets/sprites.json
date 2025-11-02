@@ -1,0 +1,81 @@
+{
+  "creatures": {
+    "herbivores": {
+      "standard": "🐰",
+      "fast": "🐇",
+      "large": "🦌",
+      "small": "🐁"
+    },
+    "carnivores": {
+      "standard": "🦊",
+      "apex": "🐺",
+      "scavenger": "🦅",
+      "omnivore": "🐻"
+    },
+    "special": {
+      "lizard": "🦎",
+      "dragon": "🐉",
+      "unicorn": "🦄",
+      "bat": "🦇",
+      "larva": "🐛",
+      "egg": "🥚"
+    }
+  },
+  "plants": {
+    "sprout": "🌱",
+    "herb": "🌿",
+    "grass": "🌾",
+    "tree": "🌲",
+    "deciduous_tree": "🌳",
+    "cactus": "🌵",
+    "mushroom": "🍄"
+  },
+  "terrain": {
+    "water": "💧",
+    "ocean": "🌊",
+    "mountain": "🏔️",
+    "desert": "🏜️",
+    "ice": "❄️",
+    "fire": "🔥",
+    "death": "💀"
+  },
+  "status": {
+    "sleeping": "💤",
+    "breeding": "❤️",
+    "injured": "💔",
+    "energized": "⚡",
+    "tired": "😴",
+    "eating": "😋",
+    "scared": "😨",
+    "angry": "😡",
+    "thinking": "💭",
+    "learned": "💡",
+    "levelup": "✨",
+    "elite": "⭐",
+    "mutation": "💫",
+    "selected": "🎯",
+    "observed": "👁️"
+  },
+  "effects": {
+    "birth": ["·", "✧", "✨", "⭐", "✨"],
+    "death": ["💀", "※", "·", "·", " "],
+    "attack": ["💥", "⚡", "💢", "✨"],
+    "evolution": ["⚡", "🧬", "✨", "🌟", "✨"],
+    "heal": ["❤️", "💚", "✨", "💖"],
+    "eat": ["🍃", "😋", "+20"],
+    "chase": ["💨", "💨", "💨"],
+    "scent": ["·", "·", "·", "·"]
+  },
+  "ui": {
+    "menu_arrow": "▸",
+    "checkmark": "✅",
+    "warning": "⚠️",
+    "info": "ℹ️",
+    "command": "💬",
+    "world": "🌍",
+    "stats": "📊",
+    "graphs": "📈",
+    "evolution": "🧬",
+    "settings": "⚙️"
+  }
+}

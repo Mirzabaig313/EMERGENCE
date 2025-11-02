@@ -1,0 +1,115 @@
+{
+  "themes": [
+    {
+      "id": "default",
+      "name": "Neon Terminal",
+      "description": "Bright neon colors on dark background",
+      "colors": {
+        "herbivore_healthy": [0, 255, 0],
+        "herbivore_hungry": [200, 200, 0],
+        "herbivore_baby": [150, 255, 150],
+        "carnivore_normal": [255, 69, 0],
+        "carnivore_hunting": [255, 0, 0],
+        "carnivore_apex": [139, 0, 0],
+        "scavenger": [128, 128, 128],
+        "omnivore": [139, 69, 19],
+        "camouflage": [100, 100, 60],
+        "mythical": [138, 43, 226],
+        "plant_young": [50, 205, 50],
+        "plant_mature": [34, 139, 34],
+        "plant_dying": [139, 69, 19],
+        "water": [0, 191, 255],
+        "desert": [255, 215, 0],
+        "forest": [34, 139, 34],
+        "mountain": [169, 169, 169],
+        "plains": [154, 205, 50],
+        "ui_border": [0, 255, 255],
+        "ui_header": [0, 191, 255],
+        "ui_text": [255, 255, 255],
+        "ui_dim": [128, 128, 128],
+        "ui_highlight": [255, 255, 0],
+        "ui_success": [0, 255, 0],
+        "ui_error": [255, 0, 0],
+        "ui_warning": [255, 165, 0],
+        "graph_line1": [0, 255, 127],
+        "graph_line2": [255, 20, 147],
+        "graph_line3": [255, 215, 0],
+        "graph_grid": [64, 64, 64],
+        "msg_normal": [200, 200, 200],
+        "msg_birth": [0, 255, 0],
+        "msg_death": [255, 0, 0],
+        "msg_evolution": [138, 43, 226],
+        "msg_achievement": [255, 215, 0],
+        "msg_warning": [255, 165, 0],
+        "msg_info": [0, 191, 255]
+      }
+    },
+    {
+      "id": "dark",
+      "name": "Dark Mode",
+      "description": "Muted colors for low-light environments",
+      "colors": {
+        "herbivore_healthy": [0, 200, 0],
+        "herbivore_hungry": [180, 180, 0],
+        "herbivore_baby": [120, 220, 120],
+        "carnivore_normal": [220, 50, 0],
+        "carnivore_hunting": [220, 0, 0],
+        "carnivore_apex": [120, 0, 0],
+        "water": [0, 150, 200],
+        "forest": [20, 100, 20],
+        "desert": [200, 170, 0],
+        "ui_border": [0, 180, 180],
+        "ui_header": [0, 140, 200],
+        "ui_text": [220, 220, 220],
+        "ui_highlight": [220, 220, 0]
+      }
+    },
+    {
+      "id": "light",
+      "name": "Light Mode",
+      "description": "High contrast for bright environments",
+      "colors": {
+        "herbivore_healthy": [0, 180, 0],
+        "carnivore_normal": [200, 80, 0],
+        "water": [0, 150, 255],
+        "forest": [40, 170, 40],
+        "desert": [240, 200, 0],
+        "ui_border": [0, 120, 220],
+        "ui_header": [0, 120, 200],
+        "ui_text": [30, 30, 30],
+        "ui_dim": [100, 100, 100],
+        "ui_highlight": [200, 120, 0]
+      }
+    },
+    {
+      "id": "retro",
+      "name": "Retro Terminal",
+      "description": "Classic green phosphor terminal",
+      "colors": {
+        "herbivore_healthy": [0, 255, 0],
+        "carnivore_normal": [0, 200, 0],
+        "ui_border": [0, 255, 0],
+        "ui_header": [0, 200, 0],
+        "ui_text": [0, 255, 0],
+        "ui_dim": [0, 150, 0],
+        "ui_highlight": [0, 200, 0]
+      }
+    },
+    {
+      "id": "cyberpunk",
+      "name": "Cyberpunk",
+      "description": "Pink and cyan neon aesthetic",
+      "colors": {
+        "herbivore_healthy": [0, 255, 180],
+        "carnivore_normal": [255, 0, 128],
+        "water": [0, 180, 255],
+        "forest": [0, 255, 200],
+        "desert": [255, 120, 0],
+        "ui_border": [0, 255, 255],
+        "ui_header": [255, 0, 200],
+        "ui_text": [255, 255, 255],
+        "ui_highlight": [255, 255, 0]
+      }
+    }
+  ]
+}

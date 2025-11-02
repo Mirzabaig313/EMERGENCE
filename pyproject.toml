@@ -1,0 +1,18 @@
+[project]
+name = "emergence"
+version = "0.1.0"
+description = "EMERGENCE - AI ecosystem simulator with neural networks, reinforcement learning, and genetic evolution"
+authors = [{name = "EMERGENCE Team"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "rich>=13.0",
+    "textual>=0.47.0",
+    "thefuzz>=0.20.0",
+    "prompt-toolkit>=3.0.0",
+]
+
+[project.scripts]
+emergence = "emergence.tui_app:run_tui"
+emergence-cli = "emergence.cli:main"

@@ -1,0 +1,219 @@
+{
+  "layouts": {
+    "main_dashboard": {
+      "name": "Main Dashboard",
+      "description": "Full dashboard with header, world view, status panel, log, and command",
+      "dimensions": {
+        "width": 120,
+        "height": 40
+      },
+      "sections": [
+        {
+          "name": "header",
+          "type": "panel",
+          "position": [0, 0],
+          "size": [120, 2],
+          "border_style": "double"
+        },
+        {
+          "name": "world_view",
+          "type": "panel",
+          "position": [0, 3],
+          "size": [84, 25],
+          "border_style": "double"
+        },
+        {
+          "name": "status_panel",
+          "type": "panel",
+          "position": [85, 3],
+          "size": [35, 25],
+          "border_style": "double"
+        },
+        {
+          "name": "message_log",
+          "type": "panel",
+          "position": [0, 29],
+          "size": [120, 6],
+          "border_style": "double"
+        },
+        {
+          "name": "command_input",
+          "type": "panel",
+          "position": [0, 36],
+          "size": [120, 4],
+          "border_style": "double"
+        }
+      ]
+    },
+    "split_horizontal": {
+      "name": "Horizontal Split",
+      "description": "Left and right panes",
+      "dimensions": {
+        "width": 120,
+        "height": 40
+      },
+      "sections": [
+        {
+          "name": "left",
+          "type": "panel",
+          "position": [0, 0],
+          "size": [60, 40],
+          "border_style": "light"
+        },
+        {
+          "name": "right",
+          "type": "panel",
+          "position": [61, 0],
+          "size": [59, 40],
+          "border_style": "light"
+        }
+      ]
+    },
+    "split_vertical": {
+      "name": "Vertical Split",
+      "description": "Top and bottom panes",
+      "dimensions": {
+        "width": 120,
+        "height": 40
+      },
+      "sections": [
+        {
+          "name": "top",
+          "type": "panel",
+          "position": [0, 0],
+          "size": [120, 20],
+          "border_style": "light"
+        },
+        {
+          "name": "bottom",
+          "type": "panel",
+          "position": [0, 21],
+          "size": [120, 19],
+          "border_style": "light"
+        }
+      ]
+    },
+    "three_column": {
+      "name": "Three Columns",
+      "description": "Left, center, and right columns",
+      "dimensions": {
+        "width": 120,
+        "height": 40
+      },
+      "sections": [
+        {
+          "name": "left",
+          "type": "panel",
+          "position": [0, 0],
+          "size": [30, 40],
+          "border_style": "light"
+        },
+        {
+          "name": "center",
+          "type": "panel",
+          "position": [31, 0],
+          "size": [58, 40],
+          "border_style": "light"
+        },
+        {
+          "name": "right",
+          "type": "panel",
+          "position": [90, 0],
+          "size": [30, 40],
+          "border_style": "light"
+        }
+      ]
+    },
+    "tabbed_interface": {
+      "name": "Tabbed Interface",
+      "description": "Tab bar with content area",
+      "dimensions": {
+        "width": 120,
+        "height": 40
+      },
+      "sections": [
+        {
+          "name": "tab_bar",
+          "type": "tabs",
+          "position": [0, 0],
+          "size": [120, 1],
+          "border_style": "double",
+          "tabs": ["🌍 World", "📊 Dashboard", "📈 Graphs", "🧬 Evolution", "⚙️ Settings"]
+        },
+        {
+          "name": "content",
+          "type": "panel",
+          "position": [0, 2],
+          "size": [120, 38],
+          "border_style": "double"
+        }
+      ]
+    },
+    "menu_overlay": {
+      "name": "Menu Overlay",
+      "description": "Centered menu for game options",
+      "dimensions": {
+        "width": 30,
+        "height": 15
+      },
+      "sections": [
+        {
+          "name": "menu",
+          "type": "menu",
+          "position": [0, 0],
+          "size": [30, 15],
+          "border_style": "light",
+          "items": ["New Game", "Load Game", "Settings", "Quit"]
+        }
+      ]
+    },
+    "command_palette": {
+      "name": "Command Palette",
+      "description": "Autocomplete command input",
+      "dimensions": {
+        "width": 80,
+        "height": 10
+      },
+      "sections": [
+        {
+          "name": "input",
+          "type": "input",
+          "position": [0, 0],
+          "size": [80, 2],
+          "border_style": "double"
+        },
+        {
+          "name": "suggestions",
+          "type": "list",
+          "position": [0, 3],
+          "size": [80, 7],
+          "border_style": "double"
+        }
+      ]
+    },
+    "stats_panel": {
+      "name": "Stats Panel",
+      "description": "Statistics display panel",
+      "dimensions": {
+        "width": 30,
+        "height": 20
+      },
+      "sections": [
+        {
+          "name": "header",
+          "type": "text",
+          "position": [0, 0],
+          "size": [30, 1],
+          "content": "STATS"
+        },
+        {
+          "name": "content",
+          "type": "stats",
+          "position": [0, 2],
+          "size": [30, 18],
+          "border_style": "heavy"
+        }
+      ]
+    }
+  }
+}

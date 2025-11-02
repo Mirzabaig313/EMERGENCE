@@ -1,0 +1,305 @@
+{
+  "version": "1.0.0",
+  "name": "EMERGENCE Grayscale Creature Sprites",
+  "description": "Classic roguelike-style grayscale block art creature sprites for EMERGENCE ecosystem simulator",
+  "style": "grayscale_block_art",
+  "character_set": "unicode_blocks",
+  "palette": {
+    "solid": "█",
+    "dark": "▓",
+    "medium": "▒",
+    "light": "░",
+    "empty": " ",
+    "upper_half": "▀",
+    "lower_half": "▄",
+    "left_half": "▌",
+    "right_half": "▐",
+    "small_filled": "■",
+    "small_empty": "□",
+    "tiny_filled": "▪",
+    "tiny_empty": "▫"
+  },
+  "creatures": {
+    "giant_rat": {
+      "tier": 1,
+      "category": "basic",
+      "display_name": "Giant Rat",
+      "description": "Small vermin creature",
+      "width": 18,
+      "height": 14,
+      "anchor_x": 9,
+      "anchor_y": 13,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "goblin": {
+      "tier": 1,
+      "category": "basic",
+      "display_name": "Goblin",
+      "description": "Mischievous humanoid creature",
+      "width": 18,
+      "height": 16,
+      "anchor_x": 9,
+      "anchor_y": 15,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "zombie": {
+      "tier": 1,
+      "category": "basic",
+      "display_name": "Zombie",
+      "description": "Shambling undead",
+      "width": 20,
+      "height": 17,
+      "anchor_x": 10,
+      "anchor_y": 16,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 8,
+      "default_state": "idle_right"
+    },
+    "skeleton_warrior": {
+      "tier": 1,
+      "category": "basic",
+      "display_name": "Skeleton Warrior",
+      "description": "Armed bone fighter",
+      "width": 22,
+      "height": 17,
+      "anchor_x": 11,
+      "anchor_y": 16,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "werewolf": {
+      "tier": 2,
+      "category": "advanced",
+      "display_name": "Werewolf",
+      "description": "Fierce lycanthrope",
+      "width": 22,
+      "height": 18,
+      "anchor_x": 11,
+      "anchor_y": 17,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 12,
+      "default_state": "idle_right"
+    },
+    "vampire": {
+      "tier": 2,
+      "category": "advanced",
+      "display_name": "Vampire",
+      "description": "Blood-drinking aristocrat",
+      "width": 22,
+      "height": 18,
+      "anchor_x": 11,
+      "anchor_y": 17,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "giant_spider": {
+      "tier": 2,
+      "category": "advanced",
+      "display_name": "Giant Spider",
+      "description": "Eight-legged horror",
+      "width": 22,
+      "height": 15,
+      "anchor_x": 11,
+      "anchor_y": 14,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 12,
+      "default_state": "idle_right"
+    },
+    "wyvern": {
+      "tier": 2,
+      "category": "advanced",
+      "display_name": "Wyvern",
+      "description": "Dragon-like flying creature",
+      "width": 35,
+      "height": 18,
+      "anchor_x": 17,
+      "anchor_y": 17,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 15,
+      "default_state": "idle_right"
+    },
+    "demon": {
+      "tier": 3,
+      "category": "elite",
+      "display_name": "Demon",
+      "description": "Infernal warrior",
+      "width": 20,
+      "height": 17,
+      "anchor_x": 10,
+      "anchor_y": 16,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 12,
+      "default_state": "idle_right"
+    },
+    "basilisk": {
+      "tier": 3,
+      "category": "elite",
+      "display_name": "Basilisk",
+      "description": "Serpentine beast",
+      "width": 22,
+      "height": 17,
+      "anchor_x": 11,
+      "anchor_y": 16,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "undead_knight": {
+      "tier": 3,
+      "category": "elite",
+      "display_name": "Undead Knight",
+      "description": "Armored revenant with heavy weaponry",
+      "width": 32,
+      "height": 15,
+      "anchor_x": 9,
+      "anchor_y": 14,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 8,
+      "default_state": "idle_right"
+    },
+    "chimera": {
+      "tier": 3,
+      "category": "elite",
+      "display_name": "Chimera",
+      "description": "Multi-headed beast",
+      "width": 22,
+      "height": 14,
+      "anchor_x": 11,
+      "anchor_y": 13,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 12,
+      "default_state": "idle_right"
+    },
+    "dragon": {
+      "tier": 4,
+      "category": "boss",
+      "display_name": "Dragon",
+      "description": "Apex predator and fire-breather",
+      "width": 45,
+      "height": 18,
+      "anchor_x": 22,
+      "anchor_y": 17,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 15,
+      "default_state": "idle_right"
+    },
+    "lich": {
+      "tier": 4,
+      "category": "boss",
+      "display_name": "Lich",
+      "description": "Powerful undead sorcerer",
+      "width": 35,
+      "height": 21,
+      "anchor_x": 17,
+      "anchor_y": 20,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "hydra": {
+      "tier": 4,
+      "category": "boss",
+      "display_name": "Hydra",
+      "description": "Multi-headed serpent",
+      "width": 35,
+      "height": 17,
+      "anchor_x": 17,
+      "anchor_y": 16,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 12,
+      "default_state": "idle_right"
+    },
+    "mimic": {
+      "tier": 2,
+      "category": "special",
+      "display_name": "Mimic",
+      "description": "Treasure chest imposter",
+      "width": 18,
+      "height": 12,
+      "anchor_x": 9,
+      "anchor_y": 9,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 10,
+      "default_state": "idle_right"
+    },
+    "golem": {
+      "tier": 3,
+      "category": "special",
+      "display_name": "Golem",
+      "description": "Animated stone guardian",
+      "width": 30,
+      "height": 18,
+      "anchor_x": 15,
+      "anchor_y": 17,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 8,
+      "default_state": "idle_right"
+    },
+    "elemental": {
+      "tier": 3,
+      "category": "special",
+      "display_name": "Elemental (Fire)",
+      "description": "Living flame creature",
+      "width": 24,
+      "height": 16,
+      "anchor_x": 12,
+      "anchor_y": 15,
+      "states": ["idle_right", "attack_right", "damaged_right", "death"],
+      "animation_fps": 15,
+      "default_state": "idle_right"
+    }
+  },
+  "tiers": {
+    "1": {
+      "name": "Basic Enemies",
+      "description": "Entry-level creatures for early gameplay",
+      "creatures": ["giant_rat", "goblin", "zombie", "skeleton_warrior"]
+    },
+    "2": {
+      "name": "Advanced Enemies",
+      "description": "Intermediate difficulty creatures",
+      "creatures": ["werewolf", "vampire", "giant_spider", "wyvern"]
+    },
+    "3": {
+      "name": "Elite Enemies",
+      "description": "High-level challenging creatures",
+      "creatures": ["demon", "basilisk", "undead_knight", "chimera"]
+    },
+    "4": {
+      "name": "Boss Enemies",
+      "description": "Epic boss-level creatures",
+      "creatures": ["dragon", "lich", "hydra"]
+    },
+    "special": {
+      "name": "Special Creatures",
+      "description": "Unique creatures with special mechanics",
+      "creatures": ["mimic", "golem", "elemental"]
+    }
+  },
+  "animation_timings": {
+    "idle": 1.0,
+    "attack": 0.3,
+    "damaged": 0.2,
+    "death": 0.5
+  },
+  "rendering": {
+    "supports_flipping": true,
+    "supports_tinting": true,
+    "terminal_compatible": true,
+    "max_width": 45,
+    "max_height": 21
+  },
+  "metadata": {
+    "author": "EMERGENCE Development Team",
+    "created": "2024",
+    "format_version": "1.0",
+    "total_creatures": 18,
+    "total_sprites": 72
+  }
+}

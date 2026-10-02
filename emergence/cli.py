@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import argparse
+import math
 import shlex
 import sys
 import time
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
+import numpy as np
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
@@ -14,7 +17,8 @@ from rich.table import Table
 from emergence.dashboard import Dashboard
 from emergence.entities import Herbivore, Plant
 from emergence.visualization import Visualizer
-from emergence.world import World
+from emergence.brains import BRAIN_TYPES
+from emergence.world import World, WorldConfig
 
 # Import gameplay systems
 try:
@@ -26,12 +30,73 @@ except ImportError:
     GAMEPLAY_ENABLED = False
 
 
+# Shared input validation (also used by the TUI) --------------------------
+def parse_finite_float(text: Optional[str], default: float) -> float:
+    """Parse a float, rejecting nan/inf (they would corrupt brain weights permanently)."""
+    if text is None:
+        return default
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(f"{text!r} is not a finite number")
+    return value
+
+
+def parse_int(text: Optional[str], default: int, lo: int, hi: int) -> int:
+    """Parse an int and require lo <= value <= hi."""
+    if text is None:
+        return default
+    value = int(text)
+    if not lo <= value <= hi:
+        raise ValueError(f"value must be between {lo} and {hi}, got {value}")
+    return value
+
+
+def _nonneg_int(text: str) -> int:
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not an integer")
+    if value < 0:
+        raise argparse.ArgumentTypeError("seed must be >= 0")
+    return value
+
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Command-line options shared by `python -m emergence`, `emergence` and `emergence-cli`."""
+    parser = argparse.ArgumentParser(prog="emergence", description="EMERGENCE AI ecosystem simulator")
+    parser.add_argument("--cli", action="store_true", help="Use the classic command-line interface instead of the TUI")
+    parser.add_argument("--brain", choices=BRAIN_TYPES, default="random", help="Brain type for spawned creatures")
+    parser.add_argument("--seed", type=_nonneg_int, default=None, help="RNG seed for reproducible runs")
+    parser.add_argument("--disease", action="store_true", help="Enable the disease / immune system mechanic")
+    return parser.parse_args(argv)
+
+
+def build_world(args: argparse.Namespace) -> World:
+    return World(
+        config=WorldConfig(brain_type=args.brain, disease_enabled=args.disease),
+        rng=np.random.default_rng(args.seed),
+    )
+
+
+def bootstrap_world(world: World) -> None:
+    """Starting ecosystem: 40 plants, then 10 herbivores. No-op for an already populated world."""
+    if world.herbivores:
+        return
+    for _ in range(40):
+        world.spawn_plant()
+    for _ in range(10):
+        world.spawn_herbivore()
+
+
+SIMULATE_MAX_TICKS = 100_000
+
+
 class EmergenceCLI:
     """Interactive CLI interface for EMERGENCE simulator."""
 
-    def __init__(self) -> None:
+    def __init__(self, world: Optional[World] = None) -> None:
         self.console = Console()
-        self.world = World()
+        self.world = world if world is not None else World()
         self.visualizer = Visualizer(self.world)
         self.dashboard = Dashboard(self.world, self.console)
         self.auto_mode = False
@@ -40,10 +105,7 @@ class EmergenceCLI:
         self._bootstrap_ecosystem()
 
     def _bootstrap_ecosystem(self) -> None:
-        for _ in range(40):
-            self.world.spawn_plant()
-        for _ in range(10):
-            self.world.spawn_herbivore()
+        bootstrap_world(self.world)
 
     def run(self) -> None:
         self.console.print(Panel("[bold cyan]Welcome to EMERGENCE[/bold cyan]\nType 'help' for commands."))
@@ -92,6 +154,9 @@ class EmergenceCLI:
                 "speed": self.command_speed,
                 "follow": self.command_follow,
                 "auto_mode": self.command_auto_mode,
+                "brain": self.command_brain,
+                "compare_brains": self.command_compare_brains,
+                "disease": self.command_disease,
                 "quit": self.command_quit,
                 "exit": self.command_quit,
             }
@@ -150,6 +215,9 @@ class EmergenceCLI:
         table.add_row("speed [multiplier]", "Adjust visualization speed")
         table.add_row("follow [name]", "Follow a creature in view mode")
         table.add_row("auto_mode on/off", "Toggle automatic resource management")
+        table.add_row("brain [type]", f"Show/set brain type for new spawns ({', '.join(BRAIN_TYPES)})")
+        table.add_row("compare_brains", "Compare brain types by lifespan and fitness")
+        table.add_row("disease on/off", "Toggle the disease / immune system mechanic")
         if self.gameplay:
             table.add_row("start_mode [mode]", "Begin survival, challenge, sandbox, or speedrun mode")
             table.add_row("gameplay", "Show gameplay status and timeline")
@@ -196,7 +264,7 @@ class EmergenceCLI:
             self.console.print("[red]Usage: reward [name] [amount][/red]")
             return
         name = params[0]
-        amount = float(params[1]) if len(params) > 1 else 5.0
+        amount = parse_finite_float(params[1] if len(params) > 1 else None, 5.0)
         if self.world.reward(name, amount):
             self.console.print(f"[green]Rewarded {name} with {amount} points[/green]")
         else:
@@ -207,7 +275,7 @@ class EmergenceCLI:
             self.console.print("[red]Usage: punish [name] [amount][/red]")
             return
         name = params[0]
-        amount = float(params[1]) if len(params) > 1 else 5.0
+        amount = parse_finite_float(params[1] if len(params) > 1 else None, 5.0)
         if self.world.punish(name, amount):
             self.console.print(f"[yellow]Punished {name} with {amount} points[/yellow]")
         else:
@@ -218,7 +286,7 @@ class EmergenceCLI:
             self.console.print("[red]Usage: teach [name] [strength][/red]")
             return
         name = params[0]
-        strength = float(params[1]) if len(params) > 1 else 2.0
+        strength = parse_finite_float(params[1] if len(params) > 1 else None, 2.0)
         if self.world.reward(name, strength):
             self.console.print(f"[cyan]Provided guidance to {name} (+{strength})[/cyan]")
         else:
@@ -255,17 +323,7 @@ class EmergenceCLI:
         if not parent_a or not parent_b:
             self.console.print("[red]Both parents must be herbivores[/red]")
             return
-        child = self.world.genetics.reproduce(
-            parent_a,
-            parent_b,
-            name=f"herbivore_{self.world.next_id}",
-            position=parent_a.position,
-            rng=self.world.rng,
-        )
-        self.world.herbivores.append(child)
-        self.world.next_id += 1
-        parent_a.energy *= 0.7
-        parent_b.energy *= 0.7
+        child = self.world.breed(parent_a, parent_b)
         self.console.print(f"[cyan]Bred {parent_a.name} + {parent_b.name} -> {child.name}[/cyan]")
 
     def command_show_brain(self, params: List[str]) -> None:
@@ -285,17 +343,17 @@ class EmergenceCLI:
             self.console.print("[red]Usage: family_tree [name] [depth][/red]")
             return
         name = params[0]
-        depth = int(params[1]) if len(params) > 1 else 6
+        depth = parse_int(params[1] if len(params) > 1 else None, 6, 1, 50)
         self.dashboard.show_family_tree(name, depth=depth)
 
     def command_simulate(self, params: List[str]) -> None:
-        ticks = int(params[0]) if params else 200
+        ticks = parse_int(params[0] if params else None, 200, 1, SIMULATE_MAX_TICKS)
         stats = self.world.simulate(ticks, headless=True)
         panel = Panel(f"Simulated {ticks} ticks\n{stats}", title="Simulation Complete", expand=False)
         self.console.print(panel)
 
     def command_view(self, params: List[str]) -> None:
-        ticks = int(params[0]) if params else 200
+        ticks = parse_int(params[0] if params else None, 200, 1, SIMULATE_MAX_TICKS)
         delay = 0.1 / max(0.1, self.speed_multiplier)
         with Live(self.visualizer.render(), refresh_per_second=20, console=self.console) as live:
             for _ in range(ticks):
@@ -323,6 +381,10 @@ class EmergenceCLI:
         table.add_row("Total Deaths", str(summary.get("total_deaths", 0)))
         table.add_row("Plants Eaten", str(summary.get("total_plants_consumed", 0)))
         table.add_row("Tracked Creatures", str(summary.get("tracked_creatures", 0)))
+        table.add_row("Brain Type (spawns)", self.world.config.brain_type)
+        if self.world.config.disease_enabled:
+            table.add_row("Infected", str(self.world.infected_count()))
+            table.add_row("Infections / Recoveries", f"{self.world.stats.total_infections} / {self.world.stats.total_recoveries}")
 
         panel = Panel(table, title="Ecosystem Statistics", border_style="cyan")
         self.console.print(panel)
@@ -359,6 +421,8 @@ class EmergenceCLI:
         self.world = World.load(path)
         self.visualizer = Visualizer(self.world)
         self.dashboard = Dashboard(self.world, self.console)
+        if self.gameplay:
+            self.gameplay.attach(self.world)
         self.console.print(f"[green]Loaded world from {path}[/green]")
 
     def command_dashboard(self, _: List[str]) -> None:
@@ -411,13 +475,13 @@ class EmergenceCLI:
         event_type = None
         for param in params:
             if param.isdigit():
-                count = int(param)
+                count = parse_int(param, 10, 1, 1000)
             else:
                 event_type = param.lower()
         self.dashboard.show_recent_events(count=count, event_type=event_type)
 
     def command_top(self, params: List[str]) -> None:
-        count = int(params[0]) if params else 10
+        count = parse_int(params[0] if params else None, 10, 1, 100)
         self.dashboard.show_top_performers(count=count)
 
     def command_snapshot(self, params: List[str]) -> None:
@@ -464,11 +528,22 @@ class EmergenceCLI:
         self.console.print(f"[green]Exported statistics to {path}[/green]")
 
     def command_speed(self, params: List[str]) -> None:
+        """Set speed multiplier (valid range: 0.1 to 10.0)."""
         if not params:
             self.console.print(f"Current speed multiplier: {self.speed_multiplier}")
             return
-        self.speed_multiplier = max(0.1, float(params[0]))
-        self.console.print(f"[cyan]Speed multiplier set to {self.speed_multiplier}[/cyan]")
+        try:
+            speed = float(params[0])
+            if speed < 0.1:
+                self.console.print("[red]Speed must be at least 0.1[/red]")
+                return
+            if speed > 10.0:
+                self.console.print("[red]Speed must be at most 10.0[/red]")
+                return
+            self.speed_multiplier = speed
+            self.console.print(f"[cyan]Speed multiplier set to {self.speed_multiplier}[/cyan]")
+        except ValueError:
+            self.console.print("[red]Speed must be a number (valid range: 0.1 to 10.0)[/red]")
 
     def command_follow(self, params: List[str]) -> None:
         if not params:
@@ -497,6 +572,35 @@ class EmergenceCLI:
             self.world.config.plant_spawn_rate = 0.05
         else:
             self.console.print("[red]Usage: auto_mode on/off[/red]")
+
+    def command_brain(self, params: List[str]) -> None:
+        if not params:
+            counts = self.world.brain_type_counts()
+            alive = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "none"
+            self.console.print(f"Brain type for new spawns: [cyan]{self.world.config.brain_type}[/cyan] (alive: {alive})")
+            self.console.print(f"Available: {', '.join(BRAIN_TYPES)}")
+            return
+        kind = params[0].lower()
+        if kind not in BRAIN_TYPES:
+            self.console.print(f"[red]Unknown brain type:[/red] {kind}. Choose one of {', '.join(BRAIN_TYPES)}")
+            return
+        self.world.config.brain_type = kind
+        self.console.print(f"[green]New creatures will use the {kind} brain.[/green] Existing ones keep theirs.")
+
+    def command_compare_brains(self, _: List[str]) -> None:
+        self.dashboard.show_brain_comparison()
+
+    def command_disease(self, params: List[str]) -> None:
+        if not params:
+            state = "on" if self.world.config.disease_enabled else "off"
+            self.console.print(f"Disease is {state}. Infected: {self.world.infected_count()}")
+            return
+        flag = params[0].lower()
+        if flag not in {"on", "off"}:
+            self.console.print("[red]Usage: disease on/off[/red]")
+            return
+        self.world.config.disease_enabled = flag == "on"
+        self.console.print(f"[cyan]Disease {'enabled' if flag == 'on' else 'disabled'}.[/cyan]")
 
     def command_quit(self, _: List[str]) -> None:
         self.console.print("[yellow]Exiting EMERGENCE. Farewell![/yellow]")
@@ -634,8 +738,9 @@ class EmergenceCLI:
         self.console.print(table)
 
 
-def main() -> None:
-    cli = EmergenceCLI()
+def main(argv: Optional[List[str]] = None) -> None:
+    args = parse_args(argv)
+    cli = EmergenceCLI(build_world(args))
     cli.run()
 
 

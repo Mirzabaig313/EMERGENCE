@@ -54,8 +54,11 @@ This document confirms that **all CLI functionality has been successfully ported
 | **SIMULATION CONTROLS** | | | |
 | `speed` | ✅ | ✅ | Set speed multiplier |
 | `auto_mode` | ✅ | ✅ | Toggle resource management |
-| `follow` | ✅ | ✅ | Camera follow creature |
-| `view` | ✅ | ⚠️ | CLI: blocking live view<br>TUI: async play/pause |
+| `follow` | ✅ | ✅ | Highlights the creature (`@` in CLI view, "Selected" line in TUI). The whole world is always visible, so there is no camera pan |
+| `view` | ✅ | ✅ | CLI: blocking live view<br>TUI: starts async play |
+| `brain [type]` | ✅ | ✅ | Show/set brain type for new spawns |
+| `compare_brains` | ✅ | ✅ | Brain type comparison table |
+| `disease on/off` | ✅ | ✅ | Toggle the immune mechanic |
 | **GAMEPLAY SYSTEM** | | | |
 | `start_mode` | ✅ | ✅ | Start game modes |
 | `gameplay` | ✅ | ✅ | Show gameplay status |
@@ -215,7 +218,7 @@ achievements
 | Feedback | Console prints | Notifications + widget refresh |
 | Simulation | Blocking `view` command | Non-blocking play/pause |
 | Visualization | Rich Live context | Reactive widgets + console |
-| Command Matching | Exact match | Fuzzy matching (60%+) |
+| Command Matching | Exact match | Fuzzy matching (60%+); `quit`/`exit`/`load`/`start_mode` require an exact match |
 
 ### Visualization Strategy
 Most complex visualizations (graphs, heatmaps, timelines, brain networks) output to console while showing a notification in the TUI. This provides:

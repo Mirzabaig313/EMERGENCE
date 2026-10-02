@@ -42,8 +42,16 @@ class GameplayState:
 class GameplaySystem:
     """Main gameplay orchestrator for EMERGENCE."""
     
+    _ORIGINAL_CONFIG = (
+        ("_original_plant_spawn_rate", "plant_spawn_rate"),
+        ("_original_reproduction_threshold", "herbivore_reproduction_threshold"),
+        ("_original_max_plants", "max_plants"),
+        ("_original_spawn_energy", "herbivore_spawn_energy"),
+    )
+
     def __init__(self, world: World, console: Optional[Console] = None):
         self.world = world
+        world.gameplay_system = self
         self.console = console or Console()
         self.progression = ProgressionTracker()
         self.event_manager = EventManager()
@@ -52,13 +60,33 @@ class GameplaySystem:
         self.speedrun_best_time: Optional[int] = None
         self.challenge_progress: Dict[ChallengeType, bool] = {challenge: False for challenge in CHALLENGES}
     
+    def attach(self, world: World) -> None:
+        """Point this gameplay system at a (newly loaded) world, keeping EP and unlocks."""
+        # Stored originals describe the previous world's config; drop them without restoring.
+        for attr, _ in self._ORIGINAL_CONFIG:
+            if hasattr(self, attr):
+                delattr(self, attr)
+        self.world = world
+        world.gameplay_system = self
+
+    def _restore_challenge_config(self) -> None:
+        for attr, cfg in self._ORIGINAL_CONFIG:
+            if hasattr(self, attr):
+                setattr(self.world.config, cfg, getattr(self, attr))
+                delattr(self, attr)
+
     def start_mode(self, mode_type: GameModeType, challenge: Optional[ChallengeType] = None) -> str:
         """Start a game mode (and optional challenge)."""
         mode = GAME_MODES[mode_type]
         challenge_scenario = CHALLENGES.get(challenge) if challenge else None
         self.state = GameplayState(mode=mode, challenge=challenge_scenario)
         self.active = True
-        
+
+        # Undo any previous challenge, then apply this one before spawning so spawn energy applies.
+        self._restore_challenge_config()
+        if challenge_scenario:
+            self.apply_challenge_modifiers(challenge_scenario)
+
         # Reset world with mode-specific starting conditions
         self._reset_world_for_mode(mode)
         self.event_manager.clear_all_events()
@@ -84,7 +112,7 @@ class GameplaySystem:
         self.state.timeline_messages.append(message)
         return message
     
-    def _reset_world_for_mode(self, mode: GameMode):
+    def _reset_world_for_mode(self, mode: GameMode) -> None:
         """Reset world with starting creatures and plants for a mode."""
         # Clear existing creatures
         self.world.herbivores.clear()
@@ -99,10 +127,35 @@ class GameplaySystem:
         for _ in range(mode.start_population):
             self.world.spawn_herbivore()
     
-    def apply_challenge_modifiers(self, challenge: ChallengeScenario):
-        """Apply modifiers from challenge scenario."""
-        # Keep track of active challenge modifiers locally
-        # (Detailed integration can be implemented within world simulation later)
+    def apply_challenge_modifiers(self, challenge: ChallengeScenario) -> None:
+        """Apply modifiers from challenge scenario to world config."""
+        modifiers = challenge.modifiers
+        
+        # Apply plant-related modifiers
+        if "plant_growth_multiplier" in modifiers:
+            # Store original for potential reset
+            if not hasattr(self, '_original_plant_spawn_rate'):
+                self._original_plant_spawn_rate = self.world.config.plant_spawn_rate
+            self.world.config.plant_spawn_rate *= modifiers["plant_growth_multiplier"]
+        
+        # Apply reproduction threshold modifiers
+        if "reproduction_threshold_multiplier" in modifiers:
+            if not hasattr(self, '_original_reproduction_threshold'):
+                self._original_reproduction_threshold = self.world.config.herbivore_reproduction_threshold
+            self.world.config.herbivore_reproduction_threshold *= modifiers["reproduction_threshold_multiplier"]
+        
+        # Apply max plants modifier
+        if "max_plants_multiplier" in modifiers:
+            if not hasattr(self, '_original_max_plants'):
+                self._original_max_plants = self.world.config.max_plants
+            self.world.config.max_plants = int(self.world.config.max_plants * modifiers["max_plants_multiplier"])
+        
+        # Apply spawn energy modifier
+        if "spawn_energy_multiplier" in modifiers:
+            if not hasattr(self, '_original_spawn_energy'):
+                self._original_spawn_energy = self.world.config.herbivore_spawn_energy
+            self.world.config.herbivore_spawn_energy *= modifiers["spawn_energy_multiplier"]
+        
         self.state.timeline_messages.append(
             f"⚙️ Challenge modifiers applied: {challenge.modifiers}"
         )
@@ -116,8 +169,9 @@ class GameplaySystem:
         messages.extend(self.progression.update_generation_achievements(generation))
         
         # Random events
-        messages.extend(self.event_manager.check_random_events(generation, {}))
+        # Expire existing events first so newly triggered ones keep their full duration.
         messages.extend(self.event_manager.update_events(generation))
+        messages.extend(self.event_manager.check_random_events(generation, {}))
         
         # Check win/lose conditions
         messages.extend(self.check_victory_conditions())

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import shlex
 from typing import List, Optional
 
@@ -11,20 +12,28 @@ from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import Footer, Header, Input, Static, TabbedContent, TabPane
 from thefuzz import process
 
+from emergence.brains import BRAIN_TYPES, brain_summary_lines
+from emergence.cli import SIMULATE_MAX_TICKS, bootstrap_world, build_world, parse_args, parse_finite_float, parse_int
 from emergence.dashboard import Dashboard
 from emergence.entities import Herbivore, Plant
 from emergence.tui_widgets import (
+    CommandBrowserWidget,
     CommandInputWidget,
     ControlButtonsWidget,
+    CreatureContextMenu,
+    DetailedCreaturePanel,
     GameBannerWidget,
+    KeyboardShortcutsWidget,
     LiveGraphWidget,
+    SmartSuggestionsWidget,
     StatsPanel,
+    WelcomeTutorialWidget,
     WorldViewWidget,
 )
 from emergence.world import World
@@ -140,6 +149,31 @@ class TitleScreen(Screen):
             self.app.exit()
 
 
+class OutputScreen(ModalScreen):
+    """Scrollable modal showing Rich output recorded from a command."""
+
+    BINDINGS = [Binding("escape,q,enter", "app.pop_screen", "Close", show=True)]
+    DEFAULT_CSS = """
+    OutputScreen { align: center middle; }
+    OutputScreen > VerticalScroll {
+        width: 90%; height: 85%;
+        border: round $accent; background: $surface; padding: 0 1;
+    }
+    """
+
+    def __init__(self, title: str, body: Text) -> None:
+        super().__init__()
+        self._title = title
+        self._body = body
+
+    def compose(self) -> ComposeResult:
+        scroll = VerticalScroll()
+        scroll.border_title = self._title
+        scroll.border_subtitle = "Esc / q to close"
+        with scroll:
+            yield Static(self._body)
+
+
 class MainGameScreen(Screen):
     """Main game screen with split-pane layout."""
 
@@ -149,17 +183,22 @@ class MainGameScreen(Screen):
         Binding("ctrl+d", "dashboard_view", "Dashboard", show=True),
         Binding("ctrl+s", "save_game", "Save", show=True),
         Binding("ctrl+q", "quit_game", "Quit", show=True),
+        Binding("f1", "show_command_browser", "Commands", show=True),
+        Binding("f2", "show_keyboard_shortcuts", "Shortcuts", show=True),
+        Binding("f3", "show_tutorial", "Tutorial", show=True),
         Binding("escape", "clear_input", "Clear", show=False),
         Binding("tab", "autocomplete", "Autocomplete", show=False),
     ]
 
     is_playing: reactive[bool] = reactive(False)
     speed_multiplier: reactive[float] = reactive(1.0)
+    selected_creature_name: reactive[Optional[str]] = reactive(None)
 
     def __init__(self, world: World, **kwargs) -> None:
         super().__init__(**kwargs)
         self.world = world
-        self.console = Console()
+        # Textual owns the terminal, so Rich output from commands is recorded and shown in OutputScreen.
+        self.console = Console(record=True, file=io.StringIO(), width=110, force_terminal=True, color_system="truecolor")
         self.dashboard = Dashboard(self.world, self.console)
         self.gameplay: Optional[GameplaySystem] = (
             GameplaySystem(self.world, self.console) if GAMEPLAY_ENABLED else None
@@ -199,6 +238,9 @@ class MainGameScreen(Screen):
             "export_stats",
             "play",
             "pause",
+            "brain",
+            "compare_brains",
+            "disease",
             "quit",
             "exit",
         ]
@@ -212,68 +254,27 @@ class MainGameScreen(Screen):
                 "achievements",
             ])
 
+        # Performance optimization: throttle refresh rate
+        self.last_refresh_tick: int = 0
+        self.refresh_interval: int = 1  # Refresh every N ticks (dynamic based on speed)
+
     def compose(self) -> ComposeResult:
         """Compose the main game screen."""
         yield Header(show_clock=True)
         yield GameBannerWidget(world=self.world, id="game_banner")
 
-        # Main content with tabs
-        with TabbedContent(initial="world"):
-            with TabPane("🌍 World", id="world"):
-                with Horizontal():
-                    with Vertical(id="world_container"):
-                        yield WorldViewWidget(world=self.world, id="world_view")
-                        yield ControlButtonsWidget(id="controls")
-                    with Vertical(id="stats_container"):
-                        yield StatsPanel(world=self.world, id="stats_panel")
-                        yield LiveGraphWidget(world=self.world, graph_type="population", id="graph_widget")
-
-            with TabPane("📊 Dashboard", id="dashboard"):
-                yield Static("Dashboard View - Coming Soon", id="dashboard_view")
-
-            with TabPane("📈 Graphs", id="graphs"):
-                yield Static("Graphs View - Coming Soon", id="graphs_view")
-
-            with TabPane("🧬 Evolution", id="evolution"):
-                yield Static("Evolution View - Coming Soon", id="evolution_view")
-
-            with TabPane("⚙️ Settings", id="settings"):
-                yield Static(self._get_settings_panel(), id="settings_view")
+        # Main content - simple horizontal split layout
+        with Horizontal(id="main_content"):
+            with Vertical(id="world_container"):
+                yield WorldViewWidget(world=self.world, id="world_view")
+                yield ControlButtonsWidget(id="controls")
+            with Vertical(id="stats_container"):
+                yield StatsPanel(world=self.world, id="stats_panel")
+                yield LiveGraphWidget(world=self.world, graph_type="population", id="graph_widget")
 
         # Command input at bottom
         yield CommandInputWidget(available_commands=self.available_commands, id="command_palette")
         yield Footer()
-
-    def _get_settings_panel(self) -> Panel:
-        """Generate settings panel."""
-        text = Text()
-        text.append("╔" + "═" * 60 + "╗\n", style="cyan")
-        text.append("║", style="cyan")
-        text.append(" " * 21 + "SETTINGS" + " " * 21, style="bold cyan")
-        text.append("      ║\n", style="cyan")
-        text.append("╚" + "═" * 60 + "╝\n", style="cyan")
-        text.append("\n")
-
-        text.append("🎨 Visual Settings\n", style="bold yellow")
-        text.append("  Animation Speed:  ", style="white")
-        text.append(f"[{'░' * 4}█{'░' * 3}] {self.speed_multiplier}x\n", style="cyan")
-        text.append("  Particle Effects: ", style="white")
-        text.append("[✓] Enabled\n", style="green")
-        text.append("\n")
-
-        text.append("🎮 Gameplay Settings\n", style="bold yellow")
-        text.append("  Auto-save:        ", style="white")
-        text.append("[✓] Every 10 generations\n", style="green")
-        text.append("  Starting Pop:     ", style="white")
-        text.append(f"[{'░' * 2}█{'░' * 5}] 10 creatures\n", style="cyan")
-        text.append("\n")
-
-        text.append("⌨️  Keyboard Shortcuts\n", style="bold yellow")
-        text.append("  Ctrl+P: Play/Pause     Ctrl+F: Fast Forward\n", style="dim")
-        text.append("  Ctrl+D: Dashboard      Ctrl+S: Save\n", style="dim")
-        text.append("  Ctrl+Q: Quit           Tab: Autocomplete\n", style="dim")
-
-        return Panel(text, border_style="cyan")
 
     def on_mount(self) -> None:
         """Called when screen is mounted."""
@@ -325,92 +326,77 @@ class MainGameScreen(Screen):
             self.notify(f"Unknown command: {command}. Type 'help' for options.", severity="warning")
             return
 
+        # Never auto-run a destructive command on a fuzzy (inexact) match.
+        if best_match in {"quit", "exit", "load", "start_mode"} and command != best_match:
+            self.notify(f"Did you mean: {best_match}? Type it exactly to run it.", severity="warning")
+            return
+
         if score < 80:
-            # Ask for confirmation
             self.notify(f"Did you mean: {best_match}? Running it anyway...", severity="information")
 
         matched_command = best_match
 
-        # Execute the matched command
-        if matched_command == "help":
-            self.show_help()
-        elif matched_command == "create":
-            self.command_create(params)
-        elif matched_command == "observe":
-            self.command_observe(params)
-        elif matched_command == "simulate":
-            self.command_simulate(params)
-        elif matched_command in ("play", "pause"):
-            self.action_toggle_play()
-        elif matched_command == "feed":
-            self.command_feed(params)
-        elif matched_command == "heal":
-            self.command_heal(params)
-        elif matched_command == "stats":
-            self.show_stats()
-        elif matched_command == "population":
-            self.show_population()
-        elif matched_command == "reward":
-            self.command_reward(params)
-        elif matched_command == "punish":
-            self.command_punish(params)
-        elif matched_command == "teach":
-            self.command_teach(params)
-        elif matched_command == "breed":
-            self.command_breed(params)
-        elif matched_command == "auto_mode":
-            self.command_auto_mode(params)
-        elif matched_command == "show_brain":
-            self.command_show_brain(params)
-        elif matched_command == "show_lineage":
-            self.command_show_lineage(params)
-        elif matched_command == "family_tree":
-            self.command_family_tree(params)
-        elif matched_command == "save":
-            self.command_save(params)
-        elif matched_command == "load":
-            self.command_load(params)
-        elif matched_command == "graph":
-            self.command_graph(params)
-        elif matched_command == "heatmap":
-            self.command_heatmap(params)
-        elif matched_command == "timeline":
-            self.command_timeline(params)
-        elif matched_command == "learning_curve":
-            self.command_learning_curve(params)
-        elif matched_command == "compare_species":
-            self.command_compare_species(params)
-        elif matched_command == "events":
-            self.command_events(params)
-        elif matched_command == "top":
-            self.command_top(params)
-        elif matched_command == "snapshot":
-            self.command_snapshot(params)
-        elif matched_command == "export_stats":
-            self.command_export_stats(params)
-        elif matched_command == "speed":
-            self.command_speed(params)
-        elif matched_command == "follow":
-            self.command_follow(params)
-        elif matched_command == "dashboard":
-            self.command_dashboard(params)
-        elif matched_command in ("quit", "exit"):
-            self.app.exit()
+        # Build command dispatch dictionary
+        handlers = {
+            "help": lambda p: self.show_help(),
+            "create": self.command_create,
+            "observe": self.command_observe,
+            "simulate": self.command_simulate,
+            "play": lambda p: self.action_toggle_play(),
+            "pause": lambda p: self.action_toggle_play(),
+            "feed": self.command_feed,
+            "heal": self.command_heal,
+            "stats": lambda p: self.show_stats(),
+            "population": lambda p: self.show_population(),
+            "reward": self.command_reward,
+            "punish": self.command_punish,
+            "teach": self.command_teach,
+            "breed": self.command_breed,
+            "auto_mode": self.command_auto_mode,
+            "show_brain": self.command_show_brain,
+            "show_lineage": self.command_show_lineage,
+            "family_tree": self.command_family_tree,
+            "save": self.command_save,
+            "load": self.command_load,
+            "graph": self.command_graph,
+            "heatmap": self.command_heatmap,
+            "timeline": self.command_timeline,
+            "learning_curve": self.command_learning_curve,
+            "compare_species": self.command_compare_species,
+            "events": self.command_events,
+            "top": self.command_top,
+            "snapshot": self.command_snapshot,
+            "export_stats": self.command_export_stats,
+            "speed": self.command_speed,
+            "follow": self.command_follow,
+            "dashboard": self.command_dashboard,
+            "view": lambda p: self.action_toggle_play() if not self.is_playing else None,
+            "brain": self.command_brain,
+            "compare_brains": self.command_compare_brains,
+            "disease": self.command_disease,
+            "quit": lambda p: self.app.exit(),
+            "exit": lambda p: self.app.exit(),
+        }
+
+        # Add gameplay commands if available
+        if GAMEPLAY_ENABLED and self.gameplay:
+            handlers.update({
+                "start_mode": self.command_start_mode,
+                "gameplay": self.command_gameplay_status,
+                "unlock": self.command_unlock,
+                "achievements": self.command_achievements,
+            })
+
+        # Execute the matched command using dictionary dispatch
+        handler = handlers.get(matched_command)
+        if handler:
+            try:
+                handler(params)
+            except Exception as exc:  # keep the TUI alive on bad input
+                self.notify(f"Error: {exc}", severity="error")
+            self._show_console_output(matched_command)
         else:
-            # Check for gameplay commands
-            if GAMEPLAY_ENABLED and self.gameplay:
-                if matched_command == "start_mode":
-                    self.command_start_mode(params)
-                elif matched_command == "gameplay":
-                    self.command_gameplay_status(params)
-                elif matched_command == "unlock":
-                    self.command_unlock(params)
-                elif matched_command == "achievements":
-                    self.command_achievements(params)
-                else:
-                    self.notify(f"Command '{matched_command}' not yet implemented in TUI", severity="warning")
-            else:
-                self.notify(f"Command '{matched_command}' not yet implemented in TUI", severity="warning")
+            self.notify(f"Command '{matched_command}' not yet implemented in TUI", severity="warning")
 
     def show_help(self) -> None:
         """Show help information."""
@@ -449,7 +435,13 @@ CONTROLS:
   play/pause                  - Toggle simulation
   speed [multiplier]          - Set speed (0.1-10.0)
   auto_mode on/off            - Toggle resource spawning
-  follow [name]               - Camera follow creature
+  follow [name]               - Highlight a creature
+  view                        - Start live simulation
+
+BRAINS & DISEASE:
+  brain [type]                - Show/set brain for new spawns
+  compare_brains              - Compare brain types
+  disease on/off              - Toggle immune mechanic
 
 KEYBOARD SHORTCUTS:
   Ctrl+P - Play/Pause  |  Ctrl+F - Fast Forward
@@ -511,7 +503,7 @@ Generation: {stats['generation']}
 
     def command_simulate(self, params: List[str]) -> None:
         """Simulate N ticks."""
-        ticks = int(params[0]) if params else 10
+        ticks = parse_int(params[0] if params else None, 10, 1, SIMULATE_MAX_TICKS)
         self.notify(f"Simulating {ticks} ticks...", severity="information")
 
         # Run simulation
@@ -591,7 +583,7 @@ Top 3 Creatures:
             return
 
         name = params[0]
-        amount = float(params[1]) if len(params) > 1 else 5.0
+        amount = parse_finite_float(params[1] if len(params) > 1 else None, 5.0)
 
         if self.world.reward(name, amount):
             self.notify(f"✅ Rewarded {name} with {amount} points", severity="success")
@@ -606,7 +598,7 @@ Top 3 Creatures:
             return
 
         name = params[0]
-        amount = float(params[1]) if len(params) > 1 else 5.0
+        amount = parse_finite_float(params[1] if len(params) > 1 else None, 5.0)
 
         if self.world.punish(name, amount):
             self.notify(f"⚠️ Punished {name} with {amount} points", severity="warning")
@@ -621,7 +613,7 @@ Top 3 Creatures:
             return
 
         name = params[0]
-        strength = float(params[1]) if len(params) > 1 else 2.0
+        strength = parse_finite_float(params[1] if len(params) > 1 else None, 2.0)
 
         if self.world.reward(name, strength):
             self.notify(f"📚 Provided guidance to {name} (+{strength})", severity="information")
@@ -642,17 +634,7 @@ Top 3 Creatures:
             self.notify("Both parents must be herbivores", severity="error")
             return
 
-        child = self.world.genetics.reproduce(
-            parent_a,
-            parent_b,
-            name=f"herbivore_{self.world.next_id}",
-            position=parent_a.position,
-            rng=self.world.rng,
-        )
-        self.world.herbivores.append(child)
-        self.world.next_id += 1
-        parent_a.energy *= 0.7
-        parent_b.energy *= 0.7
+        child = self.world.breed(parent_a, parent_b)
 
         self.notify(f"✅ Bred {parent_a.name} + {parent_b.name} → {child.name}", severity="success")
         self.refresh_widgets()
@@ -711,8 +693,8 @@ Top 3 Creatures:
 
             self.world = World.load(path)
             self.dashboard = Dashboard(self.world, self.console)
-            if GAMEPLAY_ENABLED:
-                self.gameplay = GameplaySystem(self.world, self.console)
+            if self.gameplay:
+                self.gameplay.attach(self.world)  # keep EP and unlocks
 
             self.notify(f"✅ Loaded world from {path}", severity="success")
             self.refresh_widgets()
@@ -778,17 +760,12 @@ Top 3 Creatures:
             self.notify(f"Creature {params[0]} not found", severity="error")
             return
 
-        brain_info = f"""
-Brain: {params[0]}
-Weights shape: {creature.brain.weights_ih.shape}
-Hidden layer: {creature.brain.hidden_size}
-Learning rate: {creature.brain.learning_rate:.3f}
-
-See console for full brain visualization.
-"""
-        self.notify(brain_info, title=f"🧠 {params[0]} Brain", timeout=8, severity="information")
-
-        # Print full visualization to console
+        self.console.print("\n".join(
+            [f"Brain: {params[0]}", *brain_summary_lines(creature.brain),
+             f"Learning rate: {creature.agent.learning_rate:.3f}", ""]
+        ))
+        # Full visualization goes to the recording console and opens in the output modal.
+        visualizer.console = self.console
         visualizer.print_brain(params[0])
 
     def command_show_lineage(self, params: List[str]) -> None:
@@ -798,7 +775,7 @@ See console for full brain visualization.
             return
 
         self.dashboard.show_family_tree(params[0], depth=5)
-        self.notify(f"Lineage for {params[0]} shown in console", severity="information")
+        self.notify(f"Lineage for {params[0]} shown", severity="information")
 
     def command_family_tree(self, params: List[str]) -> None:
         """Show family tree."""
@@ -807,10 +784,10 @@ See console for full brain visualization.
             return
 
         name = params[0]
-        depth = int(params[1]) if len(params) > 1 else 6
+        depth = parse_int(params[1] if len(params) > 1 else None, 6, 1, 50)
 
         self.dashboard.show_family_tree(name, depth=depth)
-        self.notify(f"Family tree for {name} (depth {depth}) shown in console", severity="information")
+        self.notify(f"Family tree for {name} (depth {depth}) shown", severity="information")
 
     def command_graph(self, params: List[str]) -> None:
         """Show graphs."""
@@ -838,7 +815,7 @@ See console for full brain visualization.
             self.notify(f"Unknown graph type: {graph_type}", severity="error")
             return
 
-        self.notify(f"{graph_type.title()} graph shown in console", severity="information")
+        self.notify(f"{graph_type.title()} graph shown", severity="information")
 
     def command_heatmap(self, params: List[str]) -> None:
         """Show heatmap."""
@@ -848,12 +825,12 @@ See console for full brain visualization.
 
         heatmap_type = params[0].lower()
         self.dashboard.show_heatmap(heatmap_type)
-        self.notify(f"{heatmap_type.title()} heatmap shown in console", severity="information")
+        self.notify(f"{heatmap_type.title()} heatmap shown", severity="information")
 
     def command_timeline(self, params: List[str]) -> None:
         """Show evolution timeline."""
         self.dashboard.show_timeline()
-        self.notify("Evolution timeline shown in console", severity="information")
+        self.notify("Evolution timeline shown", severity="information")
 
     def command_learning_curve(self, params: List[str]) -> None:
         """Show learning curve."""
@@ -862,12 +839,12 @@ See console for full brain visualization.
             return
 
         self.dashboard.show_learning_curve(params[0])
-        self.notify(f"Learning curve for {params[0]} shown in console", severity="information")
+        self.notify(f"Learning curve for {params[0]} shown", severity="information")
 
     def command_compare_species(self, params: List[str]) -> None:
         """Compare species."""
         self.dashboard.show_species_comparison()
-        self.notify("Species comparison shown in console", severity="information")
+        self.notify("Species comparison shown", severity="information")
 
     def command_events(self, params: List[str]) -> None:
         """Show recent events."""
@@ -875,37 +852,44 @@ See console for full brain visualization.
         event_type = None
         for param in params:
             if param.isdigit():
-                count = int(param)
+                count = parse_int(param, 10, 1, 1000)
             else:
                 event_type = param.lower()
 
         self.dashboard.show_recent_events(count=count, event_type=event_type)
-        self.notify(f"Showing {count} recent events in console", severity="information")
+        self.notify(f"Showing {count} recent events", severity="information")
 
     def command_top(self, params: List[str]) -> None:
         """Show top performers."""
-        count = int(params[0]) if params else 10
+        count = parse_int(params[0] if params else None, 10, 1, 100)
         self.dashboard.show_top_performers(count=count)
-        self.notify(f"Top {count} performers shown in console", severity="information")
+        self.notify(f"Top {count} performers shown", severity="information")
 
     def command_dashboard(self, params: List[str]) -> None:
         """Show main dashboard."""
         self.dashboard.show_main_dashboard()
-        self.notify("Dashboard shown in console", severity="information")
+        self.notify("Dashboard shown", severity="information")
 
     # Phase 4: Advanced Controls
     def command_speed(self, params: List[str]) -> None:
-        """Set speed multiplier."""
+        """Set speed multiplier (valid range: 0.1 to 10.0)."""
         if not params:
             self.notify(f"Current speed multiplier: {self.speed_multiplier}x", severity="information")
             return
 
         try:
-            self.speed_multiplier = max(0.1, float(params[0]))
+            speed = float(params[0])
+            if speed < 0.1:
+                self.notify("Speed must be at least 0.1", severity="error")
+                return
+            if speed > 10.0:
+                self.notify("Speed must be at most 10.0", severity="error")
+                return
+            self.speed_multiplier = speed
             self.notify(f"⚡ Speed multiplier set to {self.speed_multiplier}x", severity="success")
             self.refresh_widgets()
         except ValueError:
-            self.notify("Speed must be a number", severity="error")
+            self.notify("Speed must be a number (valid range: 0.1 to 10.0)", severity="error")
 
     def command_follow(self, params: List[str]) -> None:
         """Follow a creature."""
@@ -914,17 +898,59 @@ See console for full brain visualization.
         if not hasattr(self, 'visualizer'):
             self.visualizer = Visualizer(self.world)
 
+        world_view = self.query_one("#world_view", WorldViewWidget)
         if not params:
             self.visualizer.follow_target = None
+            world_view.selected_creature = None
             self.notify("⏹️ Stopped following any creature.", severity="information")
+            self.refresh_widgets()
             return
 
         name = params[0]
         if self._find_herbivore(name):
             self.visualizer.follow_target = name
+            world_view.selected_creature = name  # rendered as the "Selected" creature in the world view
             self.notify(f"👁️ Now following {name}", severity="success")
+            self.refresh_widgets()
         else:
             self.notify(f"Creature {name} not found", severity="error")
+
+    # Brains & disease
+    def command_brain(self, params: List[str]) -> None:
+        if not params:
+            counts = self.world.brain_type_counts()
+            alive = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "none"
+            self.notify(
+                f"New spawns: {self.world.config.brain_type}\nAlive: {alive}\nAvailable: {', '.join(BRAIN_TYPES)}",
+                title="🧠 Brain", timeout=8, severity="information",
+            )
+            return
+        kind = params[0].lower()
+        if kind not in BRAIN_TYPES:
+            self.notify(f"Unknown brain type {kind}. Choose: {', '.join(BRAIN_TYPES)}", severity="error")
+            return
+        self.world.config.brain_type = kind
+        self.notify(f"🧠 New creatures will use the {kind} brain", severity="success")
+        self.refresh_widgets()
+
+    def command_compare_brains(self, params: List[str]) -> None:
+        self.dashboard.show_brain_comparison()
+        summary = self.world.stats.get_brain_type_summary(self.world.brain_type_counts())
+        lines = [f"{k}: avg fitness {v['avg_fitness']:.2f}, lifespan {v['avg_lifespan']:.0f} (n={v['deaths']})" for k, v in summary.items()]
+        self.notify("\n".join(lines) or "No brain data yet", title="🧠 Brain Comparison", timeout=10, severity="information")
+
+    def command_disease(self, params: List[str]) -> None:
+        if not params:
+            state = "on" if self.world.config.disease_enabled else "off"
+            self.notify(f"Disease is {state}. Infected: {self.world.infected_count()}", severity="information")
+            return
+        flag = params[0].lower()
+        if flag not in {"on", "off"}:
+            self.notify("Usage: disease on/off", severity="error")
+            return
+        self.world.config.disease_enabled = flag == "on"
+        self.notify(f"🦠 Disease {'enabled' if flag == 'on' else 'disabled'}", severity="success")
+        self.refresh_widgets()
 
     # Phase 5: Gameplay System Commands
     def command_start_mode(self, params: List[str]) -> None:
@@ -979,7 +1005,7 @@ See console for full brain visualization.
         self.console.print(panel)
         self.console.print(timeline)
 
-        self.notify("Gameplay status shown in console", severity="information")
+        self.notify("Gameplay status shown", severity="information")
 
     def command_unlock(self, params: List[str]) -> None:
         """Purchase an unlock."""
@@ -1033,6 +1059,91 @@ See console for full brain visualization.
 
         self.notify(achievements_text, title="Achievements", timeout=15, severity="information")
 
+    # Control button handlers
+    def on_control_buttons_widget_button_pressed(self, message: ControlButtonsWidget.ButtonPressed) -> None:
+        """Handle button press events from control buttons."""
+        action = message.action
+
+        if action == "play":
+            if not self.is_playing:
+                self.action_toggle_play()
+        elif action == "pause":
+            if self.is_playing:
+                self.action_toggle_play()
+        elif action == "fast_forward":
+            self.action_fast_forward()
+        elif action == "save":
+            self.action_save_game()
+        elif action == "stats":
+            self.show_stats()
+
+    # Smart suggestions handler
+    def on_smart_suggestions_widget_suggestion_clicked(self, message: SmartSuggestionsWidget.SuggestionClicked) -> None:
+        """Handle clicked suggestion."""
+        command_widget = self.query_one("#command_palette", CommandInputWidget)
+        command_widget.set_value(f"{message.command} ")
+        command_widget.focus_input()
+
+    # Creature interaction handlers
+    def on_world_view_widget_creature_selected(self, message: WorldViewWidget.CreatureSelected) -> None:
+        """Handle creature selection from world view."""
+        self.selected_creature_name = message.creature_name
+
+        # Update detailed creature panel
+        try:
+            details_panel = self.query_one("#creature_details", DetailedCreaturePanel)
+            details_panel.creature_name = message.creature_name
+            details_panel._update_details()
+        except Exception:
+            pass
+
+        # Show context menu as overlay
+        if not self.query("#creature_context_menu"):
+            menu = CreatureContextMenu(
+                creature_name=message.creature_name,
+                creature=message.creature,
+                id="creature_context_menu"
+            )
+            self.mount(menu)
+        else:
+            # Update existing menu
+            menu = self.query_one("#creature_context_menu", CreatureContextMenu)
+            menu.creature_name = message.creature_name
+            menu.creature = message.creature
+            menu.refresh()
+
+    def on_creature_context_menu_action_selected(self, message: CreatureContextMenu.ActionSelected) -> None:
+        """Handle action selection from context menu."""
+        action = message.action
+        creature_name = message.creature_name
+
+        # Remove the context menu
+        try:
+            menu = self.query_one("#creature_context_menu", CreatureContextMenu)
+            menu.remove()
+        except Exception:
+            pass
+
+        # Route to appropriate command
+        if action == "feed":
+            self.command_feed([creature_name])
+        elif action == "heal":
+            self.command_heal([creature_name])
+        elif action == "observe":
+            self.command_observe([creature_name])
+        elif action == "teach":
+            self.command_teach([creature_name])
+        elif action == "reward":
+            self.command_reward([creature_name])
+        elif action == "punish":
+            self.command_punish([creature_name])
+        elif action == "breed":
+            # For breed, we need to prompt for second parent
+            self.notify(f"🧬 Selected {creature_name} for breeding. Click another creature or type: breed {creature_name} [partner]", severity="information")
+        elif action == "close":
+            # Just close the menu (already done above)
+            pass
+
     # Helper methods
     def _compare_snapshots(self, name1: str, name2: str) -> None:
         """Compare two snapshots."""
@@ -1071,6 +1182,7 @@ Total Deaths: {deaths1} → {deaths2} (Δ {deaths2-deaths1:+d})
         try:
             world_view = self.query_one("#world_view", WorldViewWidget)
             world_view.world = self.world
+            world_view.render_cache = None  # create/feed/breed/load change the world without a tick
             world_view.refresh()
 
             stats_panel = self.query_one("#stats_panel", StatsPanel)
@@ -1093,6 +1205,14 @@ Total Deaths: {deaths1} → {deaths2} (Δ {deaths2-deaths1:+d})
             controls.refresh()
         except Exception:
             pass
+
+    def _show_console_output(self, command: str) -> None:
+        """Open whatever the command printed to the recording console in a modal."""
+        captured = self.console.export_text(clear=True, styles=True)
+        self.console.file.seek(0)
+        self.console.file.truncate()
+        if captured.strip():
+            self.app.push_screen(OutputScreen(command, Text.from_ansi(captured)))
 
     def _find_herbivore(self, name: str) -> Optional[Herbivore]:
         """Find a herbivore by name."""
@@ -1125,20 +1245,30 @@ Total Deaths: {deaths1} → {deaths2} (Δ {deaths2-deaths1:+d})
             self.simulation_task.cancel()
 
     async def _simulation_loop(self) -> None:
-        """Main simulation loop."""
+        """Main simulation loop with intelligent refresh throttling."""
+        # Fixed frame rate; speed sets ticks per frame, so 1x = 10 ticks/s and 10x = 100 ticks/s.
+        # ponytail: the sim still runs on the event loop; huge worlds should move step() to a thread worker.
+        frame = 0.1
+        owed = 0.0
+        loop = asyncio.get_running_loop()
         try:
             while self.is_playing:
-                # Simulate one tick
-                self.world.simulate(1, headless=False)
-
-                # Refresh widgets
-                self.refresh_widgets()
-
-                # Control speed
-                delay = 0.1 / max(0.1, self.speed_multiplier)
-                await asyncio.sleep(delay)
+                started = loop.time()
+                owed += self.speed_multiplier
+                ticks = int(owed)
+                owed -= ticks
+                if ticks:
+                    self.world.simulate(ticks, headless=False)
+                    self.refresh_widgets()
+                    self.last_refresh_tick = self.world.tick_count
+                await asyncio.sleep(max(0.0, frame - (loop.time() - started)))
         except asyncio.CancelledError:
             pass
+        except Exception as exc:  # a sim crash must be visible, not a silently dead task
+            self.is_playing = False
+            self.refresh_widgets()
+            self.notify(f"Simulation stopped: {type(exc).__name__}: {exc}", severity="error", timeout=15)
+            self.log.error("simulation loop crashed", exc_info=exc)
 
     def action_fast_forward(self) -> None:
         """Fast forward simulation."""
@@ -1199,9 +1329,57 @@ Total Deaths: {deaths1} → {deaths2} (Δ {deaths2-deaths1:+d})
         except Exception:
             pass
 
+    def action_show_command_browser(self) -> None:
+        """Show the command browser overlay."""
+        # Toggle - if already open, close it
+        existing = self.query("#command_browser")
+        if existing:
+            for browser in existing:
+                browser.remove()
+            return
+
+        # Mount new browser
+        browser = CommandBrowserWidget(
+            available_commands=self.available_commands,
+            id="command_browser"
+        )
+        self.mount(browser)
+
+    def action_show_keyboard_shortcuts(self) -> None:
+        """Show the keyboard shortcuts overlay."""
+        # Toggle - if already open, close it
+        existing = self.query("#keyboard_shortcuts")
+        if existing:
+            for shortcuts in existing:
+                shortcuts.remove()
+            return
+
+        # Mount new shortcuts panel
+        shortcuts = KeyboardShortcutsWidget(id="keyboard_shortcuts")
+        self.mount(shortcuts)
+
+    def action_show_tutorial(self) -> None:
+        """Show the welcome tutorial overlay."""
+        # Toggle - if already open, close it
+        existing = self.query("#welcome_tutorial")
+        if existing:
+            for tutorial in existing:
+                tutorial.remove()
+            return
+
+        # Mount new tutorial
+        tutorial = WelcomeTutorialWidget(id="welcome_tutorial")
+        self.mount(tutorial)
+
 
 class EmergenceApp(App):
     """Main EMERGENCE TUI application."""
+
+    # Disable Textual's default command palette (Ctrl+P) so we can use it for Play/Pause
+    ENABLE_COMMAND_PALETTE = False
+    
+    # Allow Ctrl+C to immediately exit without confirmation
+    CTRL_C_EXIT = True
 
     CSS = """
     /* Global styling for game-like appearance */
@@ -1222,77 +1400,176 @@ class EmergenceApp(App):
         padding: 2;
     }
 
+    /* Main content horizontal split */
+    #main_content {
+        height: 1fr;
+        width: 100%;
+    }
+
     /* World container - main gameplay area */
     #world_container {
-        width: 3fr;
+        width: 2fr;
         height: 100%;
         background: $surface-darken-1;
-        padding: 1;
-        border-right: solid $primary;
+        padding: 0 1;
     }
 
     /* Stats container - HUD-like sidebar */
     #stats_container {
         width: 1fr;
         height: 100%;
+        min-height: 30;
+        min-width: 40;
         background: $surface-darken-2;
-        border-left: heavy $accent;
-        padding: 1;
+        padding: 0;
+        margin-left: 1;
+        overflow-y: auto;
     }
 
     /* World view - the main game viewport */
+    /* World view - the main game viewport */
     #world_view {
-        height: 3fr;
-        background: $background 10%;
-        border: heavy $success;
-        border-title-color: $success;
-        border-subtitle-color: $text-muted;
-        margin-bottom: 1;
+        height: 1fr;
+        background: $surface-darken-3;
+        border: round $primary; 
+        transition: border 300ms;
+    }
+
+    #world_view:focus, #world_view:hover {
+        border: round $accent;
     }
 
     /* Stats panel - game HUD */
+    /* Stats panel - game HUD */
     #stats_panel {
-        height: 2fr;
+        height: auto;
+        min-height: 15;
+        background: $surface-darken-2; 
+        border: round $secondary;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+
+    /* Smart suggestions widget - proactive guidance */
+    #suggestions {
+        height: auto;
+        max-height: 10;
         background: $panel;
-        border: tall $accent;
-        border-title-color: $accent;
+        border: solid $primary;
+        border-title-color: $primary;
+        padding: 1;
+    }
+
+    #suggestions:hover {
+        border: heavy $primary;
+    }
+
+    #suggestions_panel {
+        height: 100%;
+        width: 100%;
+    }
+
+    #suggestions_title {
+        background: $boost;
+        border: solid $primary;
+        padding: 1;
+        text-align: center;
+        color: $primary;
+        text-style: bold;
+    }
+
+    #suggestions_content {
+        padding: 1;
+        overflow-y: auto;
+    }
+
+    /* Detailed creature panel - collapsible sidebar */
+    #creature_details {
+        height: auto;
+        max-height: 8;
+        background: $panel;
+        border: solid $success;
+        border-title-color: $success;
+        padding: 1;
+        display: none;
+    }
+
+    #detailed_creature_panel {
+        height: 100%;
+        width: 100%;
+    }
+
+    #btn_toggle_sidebar {
+        width: 100%;
+        margin-bottom: 1;
+    }
+
+    #creature_details_content {
+        height: 1fr;
+        overflow-y: auto;
         padding: 1;
     }
 
     /* Graph widget - metrics display */
     #graph_widget {
-        height: 1fr;
-        background: $panel;
-        border: solid $warning;
-        border-title-color: $warning;
-        padding: 1;
+        height: auto;
+        max-height: 10;
+        background: #1a1810;
+        border: round #ffa500;
+        padding: 0 1;
     }
 
     /* Control buttons - action bar */
+    /* Control buttons - action bar */
     #controls {
-        height: 4;
-        background: $boost;
-        border: wide $primary;
-        border-title-color: $primary;
+        height: auto;
+        min-height: 5;
+        background: $surface-darken-2;
+        border-top: solid $primary; 
+        padding: 1 0;
+        margin-top: 0;
+    }
+
+    #control_buttons_container {
+        height: 100%;
+        width: 100%;
+        align: center middle;
+        padding: 0;
+    }
+
+    #control_buttons_container Button {
+        margin: 0 1;
+        min-width: 8;
+        border: none;
+        background: #1a2530;
+    }
+
+    #control_buttons_container Button:hover {
+        background: #00ff88 30%;
+    }
+
+    #control_buttons_container Button:disabled {
+        opacity: 0.4;
     }
 
     /* Command palette - input console */
     #command_palette {
         dock: bottom;
-        height: 5;
-        background: $surface;
-        border-top: heavy $accent;
+        height: auto;
+        min-height: 4;
+        max-height: 5;
+        background: #080818;
     }
 
     #command_input {
-        background: $surface-darken-2;
-        border: tall $accent;
+        background: #0c0c20;
+        border: round #ff6600;
         padding: 0 1;
     }
 
     #command_suggestions {
-        height: 2;
-        background: $panel;
+        height: 1;
+        background: #0a0a18;
         padding: 0 1;
     }
 
@@ -1304,17 +1581,21 @@ class EmergenceApp(App):
 
     Tabs {
         background: $boost;
-        border-bottom: wide $primary;
+        border-bottom: heavy $primary;
+        height: auto;
+        min-height: 3;
     }
 
     Tab {
         background: $panel;
-        border: solid $primary;
+        border: heavy $primary;
         padding: 0 2;
+        transition: background 200ms, border 150ms;
     }
 
     Tab:hover {
-        background: $accent 50%;
+        background: $primary 20%;
+        border: heavy $success;
     }
 
     Tab.-active {
@@ -1326,7 +1607,14 @@ class EmergenceApp(App):
     /* Tab panes */
     TabPane {
         background: $surface;
-        padding: 1;
+        padding: 0;
+        height: 1fr;
+    }
+
+    /* Ensure Horizontal fills the tab pane */
+    TabPane > Horizontal {
+        height: 100%;
+        width: 100%;
     }
 
     /* Settings view styling */
@@ -1345,10 +1633,13 @@ class EmergenceApp(App):
 
     /* Game Banner - Top status bar */
     #game_banner {
-        height: 5;
+        height: auto;
+        min-height: 3;
+        max-height: 5;
         background: $boost;
         border-bottom: heavy $primary;
         dock: top;
+        padding: 0;
     }
 
     /* Header and Footer styling */
@@ -1357,6 +1648,7 @@ class EmergenceApp(App):
         color: $text;
         border-bottom: heavy $primary;
         text-style: bold;
+        height: auto;
     }
 
     Footer {
@@ -1379,13 +1671,15 @@ class EmergenceApp(App):
     /* Input styling */
     Input {
         background: $surface-darken-2;
-        border: tall $accent;
-        padding: 0 1;
+        border: heavy $accent;
+        padding: 1;
+        transition: border 150ms, background 200ms;
     }
 
     Input:focus {
-        border: tall $success;
+        border: wide $success;
         background: $surface-darken-1;
+        transition: border 100ms, background 150ms;
     }
 
     /* Static text styling */
@@ -1393,19 +1687,201 @@ class EmergenceApp(App):
         background: transparent;
         color: $text;
     }
+
+    /* Creature Context Menu - Overlay Popup */
+    #creature_context_menu {
+        layer: overlay;
+        align: center middle;
+        width: auto;
+        height: auto;
+    }
+
+    /* Command Browser - F1 Overlay */
+    #command_browser {
+        layer: overlay;
+        align: center middle;
+        width: 90;
+        height: 38;
+    }
+
+    /* Keyboard Shortcuts - F2 Overlay */
+    #keyboard_shortcuts {
+        layer: overlay;
+        align: center middle;
+        width: 80;
+        height: 35;
+    }
+
+    #shortcuts_panel {
+        width: 100%;
+        height: 100%;
+        background: $panel;
+        border: heavy $primary;
+        padding: 1;
+    }
+
+    #shortcuts_title {
+        background: $boost;
+        border: solid $primary;
+        padding: 1;
+        margin-bottom: 1;
+        text-align: center;
+        color: $primary;
+        text-style: bold;
+    }
+
+    #shortcuts_content {
+        height: 1fr;
+        overflow-y: auto;
+        background: $surface-darken-1;
+        border: solid $accent;
+        padding: 1;
+        margin-bottom: 1;
+    }
+
+    #btn_shortcuts_close {
+        width: 100%;
+    }
+
+    /* Welcome Tutorial - F3 Overlay */
+    #welcome_tutorial {
+        layer: overlay;
+        align: center middle;
+        width: 90;
+        height: 40;
+    }
+
+    #tutorial_overlay {
+        width: 100%;
+        height: 100%;
+        background: $panel;
+        border: heavy $accent;
+        padding: 2;
+    }
+
+    #tutorial_title {
+        background: $boost;
+        border: solid $accent;
+        padding: 1;
+        margin-bottom: 1;
+        text-align: center;
+        color: $accent;
+        text-style: bold;
+    }
+
+    #tutorial_content {
+        height: 1fr;
+        overflow-y: auto;
+        background: $surface-darken-1;
+        border: solid $primary;
+        padding: 2;
+        margin-bottom: 1;
+    }
+
+    #tutorial_buttons {
+        height: auto;
+        width: 100%;
+        align: center middle;
+    }
+
+    #tutorial_buttons Button {
+        margin: 0 1;
+        min-width: 15;
+    }
+
+    #browser_panel {
+        width: 100%;
+        height: 100%;
+        background: $panel;
+        border: heavy $primary;
+        padding: 1;
+    }
+
+    #browser_title {
+        background: $boost;
+        border: solid $primary;
+        padding: 1;
+        margin-bottom: 1;
+        text-align: center;
+        color: $primary;
+        text-style: bold;
+    }
+
+    #cmd_search {
+        margin-bottom: 1;
+        border: heavy $accent;
+        background: $surface-darken-2;
+        transition: border 150ms, background 200ms;
+    }
+
+    #cmd_search:focus {
+        border: wide $success;
+        background: $surface-darken-1;
+        transition: border 100ms, background 150ms;
+    }
+
+    #cmd_list {
+        height: 26;
+        overflow-y: auto;
+        background: $surface-darken-1;
+        border: solid $accent;
+        padding: 1;
+    }
+
+    #cmd_results {
+        width: 100%;
+    }
+
+    #btn_browser_close {
+        margin-top: 1;
+        width: 100%;
+    }
+
+    #context_menu_panel {
+        width: 50;
+        height: auto;
+        background: $panel;
+        border: heavy $accent;
+        padding: 1;
+    }
+
+    #creature_info_header {
+        background: $boost;
+        border: solid $primary;
+        padding: 1;
+        margin-bottom: 1;
+        text-align: center;
+        color: $text;
+    }
+
+    #action_buttons {
+        height: auto;
+        width: 100%;
+    }
+
+    #action_buttons Button {
+        width: 100%;
+        margin: 1 0;
+        border: solid $accent;
+        transition: all 200ms;
+    }
+
+    #action_buttons Button:hover {
+        background: $accent 50%;
+        border: wide $success;
+        transition: all 150ms;
+    }
+
+    #action_buttons Button:focus {
+        border: wide $warning;
+        text-style: bold;
+    }
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, world: Optional[World] = None, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.world = World()
-        self._bootstrap_ecosystem()
-
-    def _bootstrap_ecosystem(self) -> None:
-        """Create initial ecosystem."""
-        for _ in range(40):
-            self.world.spawn_plant()
-        for _ in range(10):
-            self.world.spawn_herbivore()
+        self.world = world if world is not None else World()
+        bootstrap_world(self.world)
 
     def on_mount(self) -> None:
         """Called when app is mounted."""
@@ -1417,9 +1893,9 @@ class EmergenceApp(App):
         self.push_screen("title")
 
 
-def run_tui() -> None:
-    """Run the TUI application."""
-    app = EmergenceApp()
+def run_tui(argv: Optional[List[str]] = None) -> None:
+    """Run the TUI application (accepts --brain/--seed/--disease)."""
+    app = EmergenceApp(world=build_world(parse_args(argv)))
     app.run()
 
 

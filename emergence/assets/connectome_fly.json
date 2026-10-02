@@ -1,0 +1,603 @@
+{
+ "schema_version": 1,
+ "synthetic_placeholder": true,
+ "source": "Janelia FlyEM male CNS connectome via neuPrint",
+ "dataset": "male-cns:v1.0",
+ "server": "https://neuprint.janelia.org",
+ "citation": "Janelia FlyEM male CNS connectome (https://male-cns.janelia.org); Cell (2026) S0092-8674(26)00942-6",
+ "license": "See dataset terms at https://male-cns.janelia.org/download/ (verify before redistribution)",
+ "attribution": "Data: Janelia FlyEM / neuPrint. Placeholder values are synthetic and NOT measured.",
+ "generated_by": "hand-authored placeholder",
+ "generated_at": null,
+ "weight_normalization": "synapses / max(synapses) over kept edges",
+ "nodes": [
+  {
+   "id": 0,
+   "name": "ISN",
+   "role": "input",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "SEZ",
+   "analog": "insulin-sensing neurons (hunger)"
+  },
+  {
+   "id": 1,
+   "name": "md_IV",
+   "role": "input",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "VNC",
+   "analog": "class IV nociceptor (health)"
+  },
+  {
+   "id": 2,
+   "name": "ORN",
+   "role": "input",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "AL",
+   "analog": "olfactory receptor neurons (food odor)"
+  },
+  {
+   "id": 3,
+   "name": "LC",
+   "role": "input",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "CX",
+   "analog": "lobula columnar visual (food bearing); ponytail: really optic lobe, filed under CX for display"
+  },
+  {
+   "id": 4,
+   "name": "JO",
+   "role": "input",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "VNC",
+   "analog": "Johnston's organ mechanosensory (self speed)"
+  },
+  {
+   "id": 5,
+   "name": "uPN_A",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "AL",
+   "analog": "uniglomerular projection neuron"
+  },
+  {
+   "id": 6,
+   "name": "uPN_B",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "AL",
+   "analog": "uniglomerular projection neuron"
+  },
+  {
+   "id": 7,
+   "name": "LN",
+   "role": "hidden",
+   "nt": "GABA",
+   "sign": -1,
+   "n_neurons": 2,
+   "neuropil": "AL",
+   "analog": "antennal lobe local interneuron"
+  },
+  {
+   "id": 8,
+   "name": "mPN",
+   "role": "hidden",
+   "nt": "GABA",
+   "sign": -1,
+   "n_neurons": 2,
+   "neuropil": "AL",
+   "analog": "multiglomerular inhibitory PN"
+  },
+  {
+   "id": 9,
+   "name": "KC_a",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "MB",
+   "analog": "Kenyon cells"
+  },
+  {
+   "id": 10,
+   "name": "KC_b",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "MB",
+   "analog": "Kenyon cells"
+  },
+  {
+   "id": 11,
+   "name": "APL",
+   "role": "hidden",
+   "nt": "GABA",
+   "sign": -1,
+   "n_neurons": 2,
+   "neuropil": "MB",
+   "analog": "anterior paired lateral (KC feedback inhibition)"
+  },
+  {
+   "id": 12,
+   "name": "MBON_app",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "MB",
+   "analog": "appetitive mushroom body output"
+  },
+  {
+   "id": 13,
+   "name": "MBON_av",
+   "role": "hidden",
+   "nt": "Glu",
+   "sign": -1,
+   "n_neurons": 2,
+   "neuropil": "MB",
+   "analog": "aversive mushroom body output"
+  },
+  {
+   "id": 14,
+   "name": "LH_ex",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "LH",
+   "analog": "lateral horn excitatory output"
+  },
+  {
+   "id": 15,
+   "name": "LH_inh",
+   "role": "hidden",
+   "nt": "GABA",
+   "sign": -1,
+   "n_neurons": 2,
+   "neuropil": "LH",
+   "analog": "lateral horn inhibitory local"
+  },
+  {
+   "id": 16,
+   "name": "PFL",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "CX",
+   "analog": "central complex steering output"
+  },
+  {
+   "id": 17,
+   "name": "Delta7",
+   "role": "hidden",
+   "nt": "Glu",
+   "sign": -1,
+   "n_neurons": 2,
+   "neuropil": "CX",
+   "analog": "protocerebral bridge ring inhibition"
+  },
+  {
+   "id": 18,
+   "name": "Hugin",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "SEZ",
+   "analog": "hugin neuroendocrine (feeding state)"
+  },
+  {
+   "id": 19,
+   "name": "FB_t",
+   "role": "hidden",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "CX",
+   "analog": "fan-shaped body tangential"
+  },
+  {
+   "id": 20,
+   "name": "DNa02_L",
+   "role": "output",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "VNC",
+   "analog": "descending steering, left"
+  },
+  {
+   "id": 21,
+   "name": "DNa02_R",
+   "role": "output",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "VNC",
+   "analog": "descending steering, right"
+  },
+  {
+   "id": 22,
+   "name": "P9",
+   "role": "output",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "VNC",
+   "analog": "descending forward walking"
+  },
+  {
+   "id": 23,
+   "name": "MDN",
+   "role": "output",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "VNC",
+   "analog": "moonwalker descending (backward)"
+  },
+  {
+   "id": 24,
+   "name": "DNg_feed",
+   "role": "output",
+   "nt": "ACh",
+   "sign": 1,
+   "n_neurons": 2,
+   "neuropil": "SEZ",
+   "analog": "descending feeding command"
+  }
+ ],
+ "edges": [
+  {
+   "pre": 2,
+   "post": 5,
+   "synapses": 300,
+   "weight": 1.0
+  },
+  {
+   "pre": 2,
+   "post": 6,
+   "synapses": 280,
+   "weight": 0.9333
+  },
+  {
+   "pre": 2,
+   "post": 7,
+   "synapses": 150,
+   "weight": 0.5
+  },
+  {
+   "pre": 2,
+   "post": 8,
+   "synapses": 120,
+   "weight": 0.4
+  },
+  {
+   "pre": 7,
+   "post": 5,
+   "synapses": 90,
+   "weight": 0.3
+  },
+  {
+   "pre": 7,
+   "post": 6,
+   "synapses": 85,
+   "weight": 0.2833
+  },
+  {
+   "pre": 5,
+   "post": 9,
+   "synapses": 60,
+   "weight": 0.2
+  },
+  {
+   "pre": 5,
+   "post": 10,
+   "synapses": 55,
+   "weight": 0.1833
+  },
+  {
+   "pre": 6,
+   "post": 9,
+   "synapses": 50,
+   "weight": 0.1667
+  },
+  {
+   "pre": 6,
+   "post": 10,
+   "synapses": 65,
+   "weight": 0.2167
+  },
+  {
+   "pre": 5,
+   "post": 14,
+   "synapses": 110,
+   "weight": 0.3667
+  },
+  {
+   "pre": 6,
+   "post": 14,
+   "synapses": 95,
+   "weight": 0.3167
+  },
+  {
+   "pre": 9,
+   "post": 12,
+   "synapses": 40,
+   "weight": 0.1333
+  },
+  {
+   "pre": 9,
+   "post": 13,
+   "synapses": 35,
+   "weight": 0.1167
+  },
+  {
+   "pre": 10,
+   "post": 12,
+   "synapses": 30,
+   "weight": 0.1
+  },
+  {
+   "pre": 10,
+   "post": 13,
+   "synapses": 45,
+   "weight": 0.15
+  },
+  {
+   "pre": 9,
+   "post": 11,
+   "synapses": 25,
+   "weight": 0.0833
+  },
+  {
+   "pre": 10,
+   "post": 11,
+   "synapses": 25,
+   "weight": 0.0833
+  },
+  {
+   "pre": 11,
+   "post": 9,
+   "synapses": 200,
+   "weight": 0.6667
+  },
+  {
+   "pre": 11,
+   "post": 10,
+   "synapses": 190,
+   "weight": 0.6333
+  },
+  {
+   "pre": 8,
+   "post": 14,
+   "synapses": 70,
+   "weight": 0.2333
+  },
+  {
+   "pre": 14,
+   "post": 22,
+   "synapses": 80,
+   "weight": 0.2667
+  },
+  {
+   "pre": 14,
+   "post": 24,
+   "synapses": 60,
+   "weight": 0.2
+  },
+  {
+   "pre": 14,
+   "post": 15,
+   "synapses": 50,
+   "weight": 0.1667
+  },
+  {
+   "pre": 15,
+   "post": 23,
+   "synapses": 75,
+   "weight": 0.25
+  },
+  {
+   "pre": 0,
+   "post": 18,
+   "synapses": 140,
+   "weight": 0.4667
+  },
+  {
+   "pre": 18,
+   "post": 24,
+   "synapses": 120,
+   "weight": 0.4
+  },
+  {
+   "pre": 18,
+   "post": 12,
+   "synapses": 40,
+   "weight": 0.1333
+  },
+  {
+   "pre": 12,
+   "post": 22,
+   "synapses": 55,
+   "weight": 0.1833
+  },
+  {
+   "pre": 12,
+   "post": 24,
+   "synapses": 65,
+   "weight": 0.2167
+  },
+  {
+   "pre": 13,
+   "post": 22,
+   "synapses": 50,
+   "weight": 0.1667
+  },
+  {
+   "pre": 13,
+   "post": 24,
+   "synapses": 45,
+   "weight": 0.15
+  },
+  {
+   "pre": 1,
+   "post": 15,
+   "synapses": 100,
+   "weight": 0.3333
+  },
+  {
+   "pre": 1,
+   "post": 23,
+   "synapses": 160,
+   "weight": 0.5333
+  },
+  {
+   "pre": 1,
+   "post": 14,
+   "synapses": 40,
+   "weight": 0.1333
+  },
+  {
+   "pre": 3,
+   "post": 16,
+   "synapses": 220,
+   "weight": 0.7333
+  },
+  {
+   "pre": 3,
+   "post": 17,
+   "synapses": 180,
+   "weight": 0.6
+  },
+  {
+   "pre": 17,
+   "post": 16,
+   "synapses": 130,
+   "weight": 0.4333
+  },
+  {
+   "pre": 17,
+   "post": 20,
+   "synapses": 90,
+   "weight": 0.3
+  },
+  {
+   "pre": 16,
+   "post": 21,
+   "synapses": 150,
+   "weight": 0.5
+  },
+  {
+   "pre": 16,
+   "post": 20,
+   "synapses": 40,
+   "weight": 0.1333
+  },
+  {
+   "pre": 19,
+   "post": 16,
+   "synapses": 70,
+   "weight": 0.2333
+  },
+  {
+   "pre": 19,
+   "post": 22,
+   "synapses": 85,
+   "weight": 0.2833
+  },
+  {
+   "pre": 4,
+   "post": 17,
+   "synapses": 60,
+   "weight": 0.2
+  },
+  {
+   "pre": 4,
+   "post": 19,
+   "synapses": 110,
+   "weight": 0.3667
+  },
+  {
+   "pre": 4,
+   "post": 15,
+   "synapses": 30,
+   "weight": 0.1
+  }
+ ],
+ "sensor_map": {
+  "hunger": [
+   [
+    0,
+    1.0
+   ]
+  ],
+  "health": [
+   [
+    1,
+    1.0
+   ]
+  ],
+  "food_distance": [
+   [
+    2,
+    -1.0
+   ]
+  ],
+  "food_direction": [
+   [
+    3,
+    1.0
+   ]
+  ],
+  "speed": [
+   [
+    4,
+    1.0
+   ]
+  ]
+ },
+ "motor_map": {
+  "move_x": [
+   [
+    20,
+    -1.0
+   ],
+   [
+    21,
+    1.0
+   ]
+  ],
+  "move_y": [
+   [
+    22,
+    1.0
+   ],
+   [
+    23,
+    -1.0
+   ]
+  ],
+  "eat": [
+   [
+    24,
+    1.0
+   ]
+  ]
+ }
+}

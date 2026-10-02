@@ -291,3 +291,26 @@ class Dashboard:
             )
 
         self.console.print(table)
+
+    def show_brain_comparison(self) -> None:
+        """Compare brain types by lifespan and fitness at death."""
+        summary = self.world.stats.get_brain_type_summary(self.world.brain_type_counts())
+        if not summary:
+            self.console.print("[yellow]No brain data yet. Run the simulation first.[/yellow]")
+            return
+        table = Table(title="Brain Type Comparison", show_header=True)
+        table.add_column("Brain", style="cyan")
+        for col in ("Alive", "Deaths", "Avg Lifespan", "Avg Fitness", "Best Fitness", "Max Gen"):
+            table.add_column(col, justify="right")
+        for brain_type, row in sorted(summary.items(), key=lambda kv: -kv[1]["avg_fitness"]):
+            table.add_row(
+                brain_type,
+                str(row["alive"]),
+                str(row["deaths"]),
+                f"{row['avg_lifespan']:.1f}",
+                f"{row['avg_fitness']:.2f}",
+                f"{row['best_fitness']:.2f}",
+                str(row["max_generation"]),
+            )
+        table.caption = "Fitness and lifespan are measured at death. Run `brain <type>` to switch future spawns."
+        self.console.print(table)

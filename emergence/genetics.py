@@ -3,7 +3,6 @@ from typing import List, Tuple
 import numpy as np
 
 from emergence.entities import Herbivore
-from emergence.neural import NeuralNetwork
 from emergence.reinforcement import RLAgent
 
 
@@ -23,7 +22,7 @@ class GeneticAlgorithm:
         self.elite_fraction = elite_fraction
 
     def select_parents(self, population: List[Herbivore], num_parents: int) -> List[Herbivore]:
-        """Tournament selection with fitness."""
+        """Truncation selection - selects top N individuals by fitness."""
         if not population:
             return []
         sorted_pop = sorted(population, key=lambda h: h.fitness, reverse=True)
@@ -33,10 +32,12 @@ class GeneticAlgorithm:
         self, parent_a: Herbivore, parent_b: Herbivore, name: str, position: np.ndarray, rng: np.random.Generator
     ) -> Herbivore:
         """Create offspring from two parents via crossover and mutation."""
-        if rng.random() < self.crossover_rate:
-            child_brain = NeuralNetwork.crossover(parent_a.agent.brain, parent_b.agent.brain, rng=rng)
+        brain_a, brain_b = parent_a.agent.brain, parent_b.agent.brain
+        # Mismatched brain types/topologies (e.g. after switching `brain` mid-run) fall back to cloning.
+        if rng.random() < self.crossover_rate and brain_a.compatible(brain_b):
+            child_brain = type(brain_a).crossover(brain_a, brain_b, rng=rng)
         else:
-            child_brain = parent_a.agent.brain.clone()
+            child_brain = brain_a.clone(rng=rng)
 
         child_brain.mutate(self.mutation_rate, self.mutation_scale)
         child_agent = RLAgent(
@@ -44,6 +45,7 @@ class GeneticAlgorithm:
             learning_rate=parent_a.agent.learning_rate,
             discount_factor=parent_a.agent.discount_factor,
             epsilon=0.3,
+            rng=rng,
         )
 
         child = Herbivore(
@@ -58,8 +60,15 @@ class GeneticAlgorithm:
             metabolism=self._mutate_trait(np.mean([parent_a.metabolism, parent_b.metabolism]), 0.05, rng),
             speed_limit=self._mutate_trait(np.mean([parent_a.speed_limit, parent_b.speed_limit]), 0.2, rng),
             vision_range=self._mutate_trait(np.mean([parent_a.vision_range, parent_b.vision_range]), 2.0, rng),
+            immune_strength=self._mutate_immunity((parent_a.immune_strength + parent_b.immune_strength) / 2, rng),
         )
         return child
+
+    def _mutate_immunity(self, value: float, rng: np.random.Generator) -> float:
+        # Same draw pattern as _mutate_trait, but clipped to [0, 1] instead of floored at 0.1.
+        if rng.random() < self.mutation_rate:
+            return float(np.clip(value + rng.normal(0, 0.05), 0.0, 1.0))
+        return float(value)
 
     def _mutate_trait(self, value: float, scale: float, rng: np.random.Generator) -> float:
         if rng.random() < self.mutation_rate:

@@ -285,10 +285,10 @@ class EventManager:
             displays.append(display)
         return displays
     
-    def clear_all_events(self):
+    def clear_all_events(self) -> None:
         """Clear all active events."""
         self.active_events.clear()
     
-    def enable_events(self, enabled: bool = True):
+    def enable_events(self, enabled: bool = True) -> None:
         """Enable or disable random events."""
         self.enabled = enabled

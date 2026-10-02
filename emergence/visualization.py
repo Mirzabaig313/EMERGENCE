@@ -56,8 +56,6 @@ class Visualizer:
 
     def _create_viewport(self) -> Text:
         # Map continuous world to discrete viewport
-        scale_x = self.viewport_width / self.world.config.width
-        scale_y = self.viewport_height / self.world.config.height
         grid = [[" " for _ in range(self.viewport_width)] for _ in range(self.viewport_height)]
 
         for plant in self.world.plants:
@@ -72,12 +70,15 @@ class Visualizer:
                 continue
             x, y = self._world_to_viewport(herbivore.position)
             if 0 <= x < self.viewport_width and 0 <= y < self.viewport_height:
-                grid[y][x] = self._herbivore_char(herbivore)
+                # The whole world is always in view, so "follow" highlights the creature instead of panning.
+                grid[y][x] = "@" if herbivore.name == self.follow_target else self._herbivore_char(herbivore)
 
         text = Text()
         for row in grid:
             for char in row:
-                if char == "H":
+                if char == "@":
+                    text.append(char, style="bold yellow")
+                elif char == "H":
                     text.append(char, style="bold red")
                 elif char == "h":
                     text.append(char, style="red")
@@ -167,7 +168,12 @@ class Visualizer:
             self.console.print(f"[red]Creature {name} not found[/red]")
             return
         brain = creature.agent.brain
-        
+        from emergence.brains import GraphBrain
+
+        if isinstance(brain, GraphBrain):
+            self._print_graph_brain(name, brain)
+            return
+
         text = Text()
         text.append(f"\n  Neural Network Architecture for {name}\n", style="bold cyan")
         text.append("  " + "=" * 50 + "\n\n", style="cyan")
@@ -206,6 +212,29 @@ class Visualizer:
             text.append(f"{weight:+.3f}\n", style="green" if weight > 0 else "red")
         
         self.console.print(Panel(text, title=f"Brain Analysis", border_style="cyan"))
+
+    def _print_graph_brain(self, name: str, brain) -> None:
+        from emergence.brains import brain_summary_lines, neuropil_table, top_readouts
+
+        text = Text()
+        text.append(f"\n  Graph Brain for {name}\n", style="bold cyan")
+        for line in brain_summary_lines(brain):
+            text.append(f"  {line}\n", style="white")
+        text.append("\n  STRONGEST READOUTS:\n", style="bold magenta")
+        for action, entries in top_readouts(brain).items():
+            joined = ", ".join(f"{label} {w:+.2f}" for label, w in entries)
+            text.append(f"    {action:8} <- {joined}\n", style="magenta")
+        self.console.print(Panel(text, title="Brain Analysis", border_style="cyan"))
+
+        rows = neuropil_table(brain)
+        if rows:
+            table = Table(title="Neuropils (FlyBrainLab-style LPU view)")
+            table.add_column("Neuropil", style="cyan")
+            table.add_column("Nodes", justify="right")
+            table.add_column("Internal edges", justify="right")
+            for np_name, nodes, edges in rows:
+                table.add_row(np_name, str(nodes), str(edges))
+            self.console.print(table)
 
     def print_lineage(self, name: str) -> None:
         creature = self._find_creature(name)

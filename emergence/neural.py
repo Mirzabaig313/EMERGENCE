@@ -13,33 +13,45 @@ class LayerWeights:
 
 
 class NeuralNetwork:
-    """Simple feed-forward neural network with sigmoid/tanh activations."""
+    """Simple feed-forward neural network with tanh hidden layers and a linear output.
 
-    def __init__(self, layer_sizes: Tuple[int, int, int], rng: np.random.Generator | None = None):
+    Implements the duck-typed brain contract documented in ``emergence.brains``.
+    """
+
+    brain_type = "random"
+
+    def __init__(self, layer_sizes: Tuple[int, ...], rng: np.random.Generator | None = None):
         if len(layer_sizes) < 2:
             raise ValueError("layer_sizes must include at least input and output size")
-        self.layer_sizes = layer_sizes
-        self.rng = rng or np.random.default_rng()
+        self.layer_sizes = tuple(layer_sizes)
+        self.rng = rng if rng is not None else np.random.default_rng()
         self.layers: List[LayerWeights] = []
-        for input_size, output_size in zip(layer_sizes[:-1], layer_sizes[1:]):
+        for input_size, output_size in zip(self.layer_sizes[:-1], self.layer_sizes[1:]):
             # Xavier initialization
             limit = np.sqrt(6 / (input_size + output_size))
             weights = self.rng.uniform(-limit, limit, size=(output_size, input_size))
             biases = np.zeros(output_size)
             self.layers.append(LayerWeights(weights=weights, biases=biases))
 
-    def clone(self) -> "NeuralNetwork":
-        clone = NeuralNetwork(self.layer_sizes, self.rng)
+    def clone(self, rng: np.random.Generator | None = None) -> "NeuralNetwork":
+        # Fresh RNG unless one is given, so parent and clone never share state by accident.
+        clone = NeuralNetwork.__new__(NeuralNetwork)
+        clone.layer_sizes = self.layer_sizes
+        clone.rng = rng if rng is not None else np.random.default_rng()
         clone.layers = [
             LayerWeights(weights=np.array(layer.weights, copy=True), biases=np.array(layer.biases, copy=True))
             for layer in self.layers
         ]
         return clone
 
-    def forward(self, inputs: np.ndarray) -> np.ndarray:
+    def compatible(self, other: object) -> bool:
+        return type(other) is NeuralNetwork and tuple(other.layer_sizes) == self.layer_sizes
+
+    def forward(self, inputs: np.ndarray, commit: bool = True) -> np.ndarray:
+        # `commit` is ignored: the MLP is stateless.
         activation = inputs
         self._cache: List[np.ndarray] = [activation]
-        for idx, layer in enumerate(self.layers[:-1]):
+        for layer in self.layers[:-1]:
             z = np.dot(layer.weights, activation) + layer.biases
             activation = np.tanh(z)
             self._cache.append(activation)
@@ -50,7 +62,7 @@ class NeuralNetwork:
         return output
 
     def backward(self, gradient: np.ndarray, learning_rate: float) -> None:
-        """Backpropagate a gradient through the network and update weights."""
+        """Backpropagate a gradient (dLoss/dOutput) through the network and update weights."""
 
         activations = self._cache
         delta = gradient
@@ -88,9 +100,9 @@ class NeuralNetwork:
 
     @staticmethod
     def crossover(parent_a: "NeuralNetwork", parent_b: "NeuralNetwork", rng: np.random.Generator | None = None) -> "NeuralNetwork":
-        if parent_a.layer_sizes != parent_b.layer_sizes:
+        if not parent_a.compatible(parent_b):
             raise ValueError("Parent networks must have identical architectures for crossover")
-        rng = rng or np.random.default_rng()
+        rng = rng if rng is not None else np.random.default_rng()
         child = NeuralNetwork(parent_a.layer_sizes, rng=rng)
         for layer_idx, (layer_a, layer_b) in enumerate(zip(parent_a.layers, parent_b.layers)):
             mix_mask = rng.random(size=layer_a.weights.shape) < 0.5
@@ -102,16 +114,24 @@ class NeuralNetwork:
 
     def to_dict(self) -> dict:
         return {
-            "layer_sizes": self.layer_sizes,
+            "type": "mlp",
+            "layer_sizes": list(self.layer_sizes),
             "layers": [
                 {"weights": layer.weights.tolist(), "biases": layer.biases.tolist()} for layer in self.layers
             ],
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "NeuralNetwork":
-        network = cls(tuple(data["layer_sizes"]))
-        for idx, layer_data in enumerate(data["layers"]):
-            network.layers[idx].weights = np.array(layer_data["weights"], dtype=float)
-            network.layers[idx].biases = np.array(layer_data["biases"], dtype=float)
+    def from_dict(cls, data: dict, rng: np.random.Generator | None = None) -> "NeuralNetwork":
+        # Build without Xavier init so loading never consumes draws from a shared rng.
+        network = cls.__new__(cls)
+        network.layer_sizes = tuple(data["layer_sizes"])
+        network.rng = rng if rng is not None else np.random.default_rng()
+        network.layers = [
+            LayerWeights(
+                weights=np.array(layer_data["weights"], dtype=float),
+                biases=np.array(layer_data["biases"], dtype=float),
+            )
+            for layer_data in data["layers"]
+        ]
         return network

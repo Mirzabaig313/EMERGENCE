@@ -10,7 +10,9 @@ from emergence.neural import NeuralNetwork
 from emergence.reinforcement import RLAgent
 
 
-@dataclass
+# eq=False on every entity class: identity equality. Field equality compares numpy positions and raises
+# ValueError inside list.remove / `in` when two entities share a name.
+@dataclass(eq=False)
 class Entity:
     name: str
     position: np.ndarray
@@ -21,7 +23,25 @@ class Entity:
         return float(np.linalg.norm(self.position - other.position))
 
 
-@dataclass
+def plant_distances(positions: np.ndarray, origin: np.ndarray) -> np.ndarray:
+    """Euclidean distances from origin to each row of positions (P, 2).
+
+    ponytail: batched matmul reproduces np.linalg.norm's BLAS dot bit-for-bit on numpy 2.x;
+    elementwise (d*d).sum() does not (~8% differ by 1 ulp, which breaks run digests).
+    tests/test_world.py guards this.
+    """
+    d = positions - origin
+    return np.sqrt(np.matmul(d[:, None, :], d[:, :, None]).ravel())
+
+
+def plant_arrays(plants: List["Plant"]) -> "tuple[np.ndarray, np.ndarray]":
+    """Snapshot plant positions (P, 2) and alive flags (P,) for vectorized queries."""
+    if not plants:
+        return np.zeros((0, 2)), np.zeros(0, dtype=bool)
+    return np.array([p.position for p in plants], dtype=float), np.array([p.alive for p in plants], dtype=bool)
+
+
+@dataclass(eq=False)
 class Plant(Entity):
     growth_stage: float = 1.0
     nutrients: float = 20.0
@@ -51,7 +71,7 @@ class Memory:
     last_reward: float = 0.0
 
 
-@dataclass
+@dataclass(eq=False)
 class Herbivore(Entity):
     energy: float = 50.0
     health: float = 100.0
@@ -74,10 +94,26 @@ class Herbivore(Entity):
 
     stats: Dict[str, float] = field(default_factory=lambda: {"plants_eaten": 0.0, "distance_travelled": 0.0})
 
-    def perceive(self, plants: List[Plant]) -> np.ndarray:
+    # Immune system (used only when WorldConfig.disease_enabled). immune_strength is heritable.
+    immune_strength: float = 0.5
+    infection: float = 0.0
+    immune_memory: bool = False
+
+    @property
+    def brain(self):
+        return self.agent.brain
+
+    @property
+    def brain_type(self) -> str:
+        return getattr(self.agent.brain, "brain_type", "random")
+
+    def perceive(
+        self, plants: List[Plant], positions: Optional[np.ndarray] = None, alive: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """Build the 5-d sensor vector. `positions`/`alive` are optional per-tick plant arrays (see World)."""
         hunger = 1.0 - (self.energy / self.max_energy)
         health_ratio = self.health / self.max_health
-        nearest_plant = self._nearest_plant(plants)
+        nearest_plant = self._nearest_plant(plants, positions, alive)
         if nearest_plant:
             delta = nearest_plant.position - self.position
             distance = np.linalg.norm(delta)
@@ -103,7 +139,8 @@ class Herbivore(Entity):
         if speed > self.speed_limit:
             self.velocity = (self.velocity / speed) * self.speed_limit
         self.position += self.velocity * dt
-        self.energy -= self.metabolism * dt + self.move_cost * speed
+        # Only deduct movement cost here; metabolism is handled in tick()
+        self.energy -= self.move_cost * speed
         self.stats["distance_travelled"] += float(speed * dt)
         # Clamp position to world boundaries (handled in world update)
         self.memory.last_reward = eat_signal
@@ -133,11 +170,20 @@ class Herbivore(Entity):
         self.agent.update(reward, next_state)
         self.fitness += reward
 
-    def _nearest_plant(self, plants: List[Plant]) -> Optional[Plant]:
-        visible_plants = [plant for plant in plants if plant.alive and self.distance_to(plant) <= self.vision_range]
-        if not visible_plants:
+    def _nearest_plant(
+        self, plants: List[Plant], positions: Optional[np.ndarray] = None, alive: Optional[np.ndarray] = None
+    ) -> Optional[Plant]:
+        if not plants:
             return None
-        return min(visible_plants, key=lambda p: self.distance_to(p))
+        if positions is None or alive is None:
+            positions, alive = plant_arrays(plants)
+        # ponytail: O(H*P) vectorized scan, fine for P up to a few thousand; upgrade path is a spatial grid.
+        dist = plant_distances(positions, self.position)
+        candidates = np.flatnonzero(alive & (dist <= self.vision_range))
+        if candidates.size == 0:
+            return None
+        # argmin keeps the first minimum, same tie-break as the old min(key=...).
+        return plants[int(candidates[np.argmin(dist[candidates])])]
 
     def copy_brain(self) -> NeuralNetwork:
         return self.agent.brain.clone()

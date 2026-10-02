@@ -163,6 +163,43 @@ See **[TUI_GUIDE.md](TUI_GUIDE.md)** for a comprehensive interactive TUI guide.
 - Inputs: hunger, health, distance to nearest plant, direction to plant, current speed.
 - Outputs: desired acceleration vector (x, y) and an eat/rest signal.
 
+### Brain Types (real neural data)
+
+Pick the brain for spawned creatures with `--brain` (or the `brain [type]` command mid-run; existing creatures keep theirs and lineages inherit their parents' type):
+
+| Type | Wiring | Dynamics |
+| --- | --- | --- |
+| `random` (default) | Dense `5 → 8 → 3` MLP | Stateless |
+| `connectome` | Fly sensorimotor circuit (25 cell types, 46 connections) with excitatory/inhibitory signs from neurotransmitters | Settles from rest each tick |
+| `connectome-recurrent` | Same circuit | State carries across ticks |
+| `recurrent` | Dense 8-node rate network | State carries across ticks |
+| `generative` | Sparse circuit sampled from MICrONS-style cell-type connection probabilities (E/PV/SST/VIP) | Settles from rest each tick |
+
+Graph brains keep Dale's law (a synapse's sign never flips) and fixed topology under mutation and crossover; lifetime learning adapts the readout only.
+
+```bash
+python -m emergence --brain connectome --seed 42          # TUI
+python -m emergence --cli --brain generative --disease     # CLI with the immune mechanic
+PYTHONPATH=. python3 scripts/bench.py --compare --ticks 3000 --seed 42   # compare all brain types headless
+```
+
+In-game: `compare_brains` shows lifespan and fitness at death per brain type; `show_brain [name]` lists the strongest readouts and, for connectome brains, a per-neuropil summary.
+
+**The bundled circuit is a hand-authored placeholder** (`"synthetic_placeholder": true` in `emergence/assets/connectome_fly.json`) shaped after known fly pathways. To replace it with real data from the Janelia male CNS connectome:
+
+```bash
+pip install -e '.[connectome]'            # neuprint-python
+export NEUPRINT_TOKEN=...                 # neuprint.janelia.org > Account > Auth Token
+python scripts/extract_connectome.py --dry-run
+python scripts/extract_connectome.py      # validates, then overwrites the asset
+```
+
+The token is read from the environment only. Use `--outputs` / `--motor-map` to choose the descending neurons that drive movement and eating.
+
+### Disease & Immunity (optional)
+
+`--disease` or `disease on` enables a single-strain infection: a heritable `immune_strength` trait costs energy every tick but speeds recovery and lowers infection risk. Recovered creatures gain lasting immunity. The gameplay DISEASE event seeds new infections.
+
 ### Reinforcement Learning
 - TD(0) style update per action with exploration decay.
 - Rewards: positive for eating and surviving; negative for starvation and death.
@@ -180,7 +217,7 @@ See **[TUI_GUIDE.md](TUI_GUIDE.md)** for a comprehensive interactive TUI guide.
 - Automatic reproduction when energy exceeds a threshold.
 
 ### Persistence
-- Entire world serialised to JSON, including neural network weights, agent parameters, and lineage metadata.
+- Entire world serialised to JSON, including brains of every type, evolved traits, agent parameters, and summary statistics. Saves are atomic, and older save files still load.
 
 ## Example Experiments
 
@@ -231,6 +268,13 @@ python examples/gameplay_demo.py
 - **Challenge Scenarios:** Fully functional drought, invasion, ice age, and extinction challenges
 - **Shared Wilderness:** Persistent multiplayer zones with leaderboards
 - **Teaching Tools:** Scripted lessons, behaviour tagging, and curriculum learning
+
+## Data Sources & Attribution
+
+- **Janelia FlyEM male CNS connectome** ([male-cns.janelia.org](https://male-cns.janelia.org/download/), via neuPrint) and its [Cell (2026) paper](https://www.cell.com/cell/fulltext/S0092-8674(26)00942-6): the source for `connectome` brains. Check the dataset terms before you redistribute an extracted circuit.
+- **MICrONS** ([microns-explorer.org](https://www.microns-explorer.org/)): inspiration for the `generative` wiring rule. The connection probabilities in `emergence/brains.py` are illustrative and were not extracted from the dataset.
+- **FlyBrainLab** ([flybrainlab.fruitflybrain.org](https://flybrainlab.fruitflybrain.org/)): inspiration for the neuropil-level circuit views. There is no direct integration.
+- **Allen Institute for Immunology** ([explore.allenimmunology.org](https://explore.allenimmunology.org/)): inspiration for the disease/immune mechanic. No data is used.
 
 ## License
 
